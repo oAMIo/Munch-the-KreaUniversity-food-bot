@@ -1,7 +1,7 @@
 """Telegram command handlers (/start, /menu, /reloadmenu, /reports, /stats, /resolve).
 
-Phases 1-2 implement /start, /menu, /reloadmenu. Later phases add the rest
-here, per SPEC.md §3/§9.
+Phases 1-3 implement /start, /menu, /reloadmenu, /reports, /resolve.
+/stats is added in phase 4, per SPEC.md §3/§9.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import ContextTypes
 
+import db
 import jobs as jobs_module
 import menu as menu_module
 
@@ -90,3 +91,54 @@ async def reloadmenu_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.application.bot_data["menu"] = new_menu
     logger.info("Menu reloaded from %s via /reloadmenu.", cfg.menu_path)
     await update.effective_message.reply_text("Menu reloaded successfully.")
+
+
+NO_REPORTS_MESSAGE = "No unresolved reports right now."
+
+
+def _format_report_line(row: tuple[int, int, str | None, str, str]) -> str:
+    report_id, user_id, username, message, created_at = row
+    who = f"@{username}" if username else f"user {user_id}"
+    return f"#{report_id} — {who} — {created_at}\n{message}"
+
+
+async def reports_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message is None:
+        return
+
+    cfg = context.application.bot_data["config"]
+    if not _is_dm(update) or not _is_admin(update, cfg):
+        return
+
+    conn = context.application.bot_data["db"]
+    rows = db.recent_unresolved_reports(conn, limit=20)
+
+    if not rows:
+        await update.effective_message.reply_text(NO_REPORTS_MESSAGE)
+        return
+
+    body = "\n\n".join(_format_report_line(row) for row in rows)
+    await update.effective_message.reply_text(body)
+
+
+async def resolve_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message is None:
+        return
+
+    cfg = context.application.bot_data["config"]
+    if not _is_dm(update) or not _is_admin(update, cfg):
+        return
+
+    if not context.args or not context.args[0].isdigit():
+        await update.effective_message.reply_text("Usage: /resolve <id>")
+        return
+
+    report_id = int(context.args[0])
+    conn = context.application.bot_data["db"]
+    resolved = db.resolve_report(conn, report_id)
+
+    if resolved:
+        logger.info("Report #%d marked resolved via /resolve.", report_id)
+        await update.effective_message.reply_text(f"Report #{report_id} marked resolved.")
+    else:
+        await update.effective_message.reply_text(f"No report with id {report_id}.")

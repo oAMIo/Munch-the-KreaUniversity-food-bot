@@ -84,5 +84,39 @@ def has_posted_menu(conn: sqlite3.Connection, meal: str, date_iso: str) -> bool:
 def mark_posted_menu(conn: sqlite3.Connection, meal: str, date_iso: str) -> None:
     set_state(conn, _last_posted_menu_key(meal), date_iso)
 
-# Ratings and reports query functions are added in phases 3-5, per
-# SPEC.md §12's build order.
+
+# --- reports -------------------------------------------------------------
+
+def insert_report(
+    conn: sqlite3.Connection,
+    *,
+    user_id: int,
+    username: str | None,
+    message: str,
+    created_at_iso: str,
+) -> int:
+    cursor = conn.execute(
+        "INSERT INTO reports (user_id, username, message, created_at, resolved) VALUES (?, ?, ?, ?, 0)",
+        (user_id, username, message, created_at_iso),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def recent_unresolved_reports(conn: sqlite3.Connection, limit: int = 20) -> list[tuple[int, int, str | None, str, str]]:
+    """Most recent unresolved reports as (id, user_id, username, message, created_at)."""
+    return conn.execute(
+        "SELECT id, user_id, username, message, created_at FROM reports "
+        "WHERE resolved = 0 ORDER BY created_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+
+def resolve_report(conn: sqlite3.Connection, report_id: int) -> bool:
+    """Mark a report resolved. Returns True if a matching report existed."""
+    cursor = conn.execute("UPDATE reports SET resolved = 1 WHERE id = ?", (report_id,))
+    conn.commit()
+    return cursor.rowcount > 0
+
+# Ratings query functions are added in phases 4-5, per SPEC.md §12's build
+# order.

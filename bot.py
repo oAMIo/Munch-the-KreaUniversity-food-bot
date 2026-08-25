@@ -11,13 +11,14 @@ import datetime
 import logging
 import sys
 
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 import config as config_module
 import db
 import handlers
 import jobs
 import menu as menu_module
+import reports
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +54,13 @@ def main() -> None:
     application.add_handler(CommandHandler("start", handlers.start_command))
     application.add_handler(CommandHandler("menu", handlers.menu_command))
     application.add_handler(CommandHandler("reloadmenu", handlers.reloadmenu_command))
+    application.add_handler(CommandHandler("reports", handlers.reports_command))
+    application.add_handler(CommandHandler("resolve", handlers.resolve_command))
+
+    # Any non-command private text message is a menu-correction report.
+    application.add_handler(
+        MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, reports.handle_report_dm)
+    )
 
     jobs.register_jobs(application)
 
