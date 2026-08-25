@@ -15,6 +15,7 @@ from telegram.ext import ContextTypes
 import db
 import jobs as jobs_module
 import menu as menu_module
+import ratings as ratings_module
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +45,24 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     cfg = context.application.bot_data["config"]
     menu_data = context.application.bot_data["menu"]
+    conn = context.application.bot_data["db"]
     week_anchor_date = context.application.bot_data["week_anchor_date"]
 
     now = datetime.datetime.now(tz=ZoneInfo(cfg.timezone))
     today = now.date()
     remaining = _remaining_meals(cfg, now.strftime("%H:%M"))
 
+    calibrated = ratings_module.is_calibrated(conn)
+    week_type = menu_module.resolve_week_type(today, week_anchor_date)
+    day = menu_module.DAYS[today.weekday()]
+
     sent_any = False
     for meal_key in remaining:
         dishes = menu_module.get_menu(menu_data, today, week_anchor_date, meal_key)
         if not dishes:
             continue
-        message = jobs_module.build_menu_message(cfg.meals[meal_key].label, today, dishes)
+        average = ratings_module.slot_average(conn, week_type, day, meal_key) if calibrated else None
+        message = jobs_module.build_menu_message(cfg.meals[meal_key].label, today, dishes, average)
         await update.effective_message.reply_text(message, parse_mode="HTML")
         sent_any = True
 

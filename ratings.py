@@ -1,15 +1,10 @@
-"""Rating prompt construction, callback handling, coverage/calibration, averages.
-
-Phase 4 implements the prompt message/keyboard builders, the callback
-handler (parse, upsert, toast), and raw coverage counting for /stats.
-is_calibrated()'s cached state flag and the averages-in-menu-posts wiring
-are added in phase 5 (SPEC.md §12).
-"""
+"""Rating prompt construction, callback handling, coverage/calibration, averages."""
 
 from __future__ import annotations
 
 import datetime
 import logging
+import sqlite3
 from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -21,6 +16,31 @@ import menu as menu_module
 logger = logging.getLogger(__name__)
 
 CALLBACK_PREFIX = "rate"
+
+_CALIBRATED_STATE_KEY = "calibrated"
+
+
+def is_calibrated(conn: sqlite3.Connection) -> bool:
+    """True once every one of menu.TOTAL_SLOTS slots has >= 1 rating.
+
+    Cached in the state table once reached (SPEC.md §5.7) so the check
+    becomes a cheap read afterwards and never regresses even if, e.g., the
+    menu file is later edited.
+    """
+    if db.get_state(conn, _CALIBRATED_STATE_KEY) == "true":
+        return True
+
+    if db.distinct_rated_slot_count(conn) >= menu_module.TOTAL_SLOTS:
+        db.set_state(conn, _CALIBRATED_STATE_KEY, "true")
+        logger.info("Calibration reached: all %d slots have been rated at least once.", menu_module.TOTAL_SLOTS)
+        return True
+
+    return False
+
+
+def slot_average(conn: sqlite3.Connection, week_type: str, day: str, meal: str) -> tuple[float, int] | None:
+    """Mean score (rounded to 1 decimal) and rating count for one slot."""
+    return db.slot_average(conn, week_type, day, meal)
 
 
 def build_rating_prompt_message(label: str) -> str:

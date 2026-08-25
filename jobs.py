@@ -16,11 +16,24 @@ import ratings as ratings_module
 logger = logging.getLogger(__name__)
 
 
-def build_menu_message(label: str, date: datetime.date, dishes: list[str]) -> str:
-    """Deterministic base menu message (SPEC.md §6). No averages yet (phase 5)."""
+def build_menu_message(
+    label: str,
+    date: datetime.date,
+    dishes: list[str],
+    average: tuple[float, int] | None = None,
+) -> str:
+    """Deterministic base menu message (SPEC.md §6).
+
+    `average`, if given as (avg, count), is appended only once calibrated
+    (SPEC.md §5.7/§5.8) — until then menu posts carry no rating info.
+    """
     header = f"\U0001F37D️ {html.escape(label)} — {date.strftime('%A')}, {date.strftime('%d %b')}"
     lines = "\n".join(f"• {html.escape(dish)}" for dish in dishes)
-    return f"{header}\n\n{lines}"
+    message = f"{header}\n\n{lines}"
+    if average is not None:
+        avg, count = average
+        message += f"\n\n★ {avg}/5 from {count} ratings"
+    return message
 
 
 async def post_menu_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -44,8 +57,14 @@ async def post_menu_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.info("Menu for %s on %s already posted; skipping duplicate fire.", meal, today_iso)
             return
 
+        average = None
+        if ratings_module.is_calibrated(conn):
+            week_type = menu_module.resolve_week_type(today, week_anchor_date)
+            day = menu_module.DAYS[today.weekday()]
+            average = ratings_module.slot_average(conn, week_type, day, meal)
+
         meal_cfg = cfg.meals[meal]
-        message = build_menu_message(meal_cfg.label, today, dishes)
+        message = build_menu_message(meal_cfg.label, today, dishes, average)
 
         await context.bot.send_message(
             chat_id=cfg.telegram_group_chat_id,
