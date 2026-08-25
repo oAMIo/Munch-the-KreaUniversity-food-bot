@@ -1,0 +1,39 @@
+timezone: "Asia/Kolkata"
+
+# Anchor for even/odd week resolution. See SPEC.md §5.2.
+# The ISO week containing this date is treated as an ODD week.
+week_anchor_date: "2026-01-05"
+
+# Times are local to `timezone`, 24-hour "HH:MM".
+# post_at  = when the menu announcement goes out
+# rate_at  = when the rating prompt goes out
+meals:
+  breakfast:
+    label: "Breakfast"
+    post_at: "07:00"
+    rate_at: "09:30"
+  lunch:
+    label: "Lunch"
+    post_at: "12:00"
+    rate_at: "14:30"
+  snack:
+    label: "Snack"
+    post_at: "16:30"
+    rate_at: "18:00"
+  dinner:
+    label: "Dinner"
+    post_at: "19:30"
+    rate_at: "21:30"
+
+llm:
+  enabled: true
+  model: "deepseek-chat"
+  max_tokens: 400
+  # Free-text personality instruction for the phrasing pass. Owner-editable.
+  persona: "Warm, brief, a little playful. Like a friend telling you what's for lunch."
+
+ratings:
+  scale_max: 5
+  # Total slots that must each have >= 1 rating before averages are shown.
+  # 7 days x 2 week types x 4 meals = 56. Computed at runtime, never hardcoded.
+  show_averages_when_calibrated: true

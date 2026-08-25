@@ -1,0 +1,73 @@
+even_week:
+  monday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+  tuesday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+  wednesday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+  thursday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+  friday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+  saturday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+  sunday:
+    breakfast: [Dish A, Dish B, Dish C]
+    lunch: [Dish A, Dish B, Dish C, Dish D]
+    snack: [Dish A, Dish B]
+    dinner: [Dish A, Dish B, Dish C]
+
+odd_week:
+  monday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
+  tuesday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
+  wednesday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
+  thursday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
+  friday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
+  saturday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
+  sunday:
+    breakfast: [Dish E, Dish F, Dish G]
+    lunch: [Dish E, Dish F, Dish G, Dish H]
+    snack: [Dish E, Dish F]
+    dinner: [Dish E, Dish F, Dish G]
