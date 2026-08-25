@@ -18,8 +18,8 @@ meals:
     rate_at: "14:30"
   snack:
     label: "Snack"
-    post_at: "16:30"
-    rate_at: "18:00"
+    post_at: "16:00"
+    rate_at: "18:30"
   dinner:
     label: "Dinner"
     post_at: "19:30"
