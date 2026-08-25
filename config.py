@@ -41,6 +41,7 @@ class LLMConfig:
     enabled: bool
     model: str
     max_tokens: int
+    timeout_seconds: int
     persona: str
 
 
@@ -153,9 +154,17 @@ def _parse_llm(raw: dict) -> LLMConfig:
     if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or max_tokens <= 0:
         raise ConfigError(f"config.yaml: {context}.max_tokens must be a positive integer, got {max_tokens!r}.")
 
+    timeout_seconds = _require_key(llm_raw, "timeout_seconds", context)
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
+        raise ConfigError(
+            f"config.yaml: {context}.timeout_seconds must be a positive integer, got {timeout_seconds!r}."
+        )
+
     persona = _require_str_key(llm_raw, "persona", context)
 
-    return LLMConfig(enabled=enabled, model=model, max_tokens=max_tokens, persona=persona)
+    return LLMConfig(
+        enabled=enabled, model=model, max_tokens=max_tokens, timeout_seconds=timeout_seconds, persona=persona
+    )
 
 
 def _parse_ratings(raw: dict) -> RatingsConfig:

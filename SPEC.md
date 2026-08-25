@@ -136,8 +136,10 @@ meals:
 
 llm:
   enabled: true
-  model: "deepseek-v4-flash"
+  model: "deepseek-chat"
   max_tokens: 400
+  # Wall-clock timeout for the phrasing-pass API call, in seconds.
+  timeout_seconds: 15
   # Free-text personality instruction for the phrasing pass. Owner-editable.
   persona: "Warm, brief, a little playful. Like a friend telling you what's for lunch."
 

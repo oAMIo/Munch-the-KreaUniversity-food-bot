@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from telegram.ext import Application, ContextTypes
 
 import db
+import llm as llm_module
 import menu as menu_module
 import ratings as ratings_module
 
@@ -65,6 +66,13 @@ async def post_menu_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
         meal_cfg = cfg.meals[meal]
         message = build_menu_message(meal_cfg.label, today, dishes, average)
+
+        if cfg.llm.enabled:
+            phrased = await llm_module.phrase_menu_message(cfg.llm, cfg.deepseek_api_key, message, dishes)
+            if phrased is not None:
+                # Re-escape: the phrased text is untrusted-ish LLM output and
+                # must still be safe under Telegram's HTML parse mode.
+                message = html.escape(phrased)
 
         await context.bot.send_message(
             chat_id=cfg.telegram_group_chat_id,
