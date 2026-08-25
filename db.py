@@ -118,5 +118,60 @@ def resolve_report(conn: sqlite3.Connection, report_id: int) -> bool:
     conn.commit()
     return cursor.rowcount > 0
 
-# Ratings query functions are added in phases 4-5, per SPEC.md §12's build
-# order.
+
+# --- ratings -------------------------------------------------------------
+
+def upsert_rating(
+    conn: sqlite3.Connection,
+    *,
+    date_iso: str,
+    week_type: str,
+    day: str,
+    meal: str,
+    user_id: int,
+    score: int,
+    created_at_iso: str,
+) -> None:
+    """Insert a rating, or update the score if this user already rated this (date, meal)."""
+    conn.execute(
+        """
+        INSERT INTO ratings (date, week_type, day, meal, user_id, score, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(date, meal, user_id) DO UPDATE SET score = excluded.score
+        """,
+        (date_iso, week_type, day, meal, user_id, score, created_at_iso),
+    )
+    conn.commit()
+
+
+def distinct_rated_slot_count(conn: sqlite3.Connection) -> int:
+    """Number of distinct (week_type, day, meal) slots with at least one rating."""
+    row = conn.execute(
+        "SELECT COUNT(DISTINCT week_type || '|' || day || '|' || meal) FROM ratings"
+    ).fetchone()
+    return row[0] if row is not None else 0
+
+
+def slot_average(conn: sqlite3.Connection, week_type: str, day: str, meal: str) -> tuple[float, int] | None:
+    """Mean score and rating count for one slot, or None if it has no ratings."""
+    row = conn.execute(
+        "SELECT AVG(score), COUNT(*) FROM ratings WHERE week_type = ? AND day = ? AND meal = ?",
+        (week_type, day, meal),
+    ).fetchone()
+    if row is None or row[1] == 0:
+        return None
+    avg, count = row
+    return round(avg, 1), count
+
+
+def slot_averages_ranked(conn: sqlite3.Connection) -> list[tuple[str, str, str, float, int]]:
+    """All rated slots as (week_type, day, meal, avg, count), highest average first."""
+    rows = conn.execute(
+        """
+        SELECT week_type, day, meal, AVG(score), COUNT(*)
+        FROM ratings
+        GROUP BY week_type, day, meal
+        ORDER BY AVG(score) DESC
+        """
+    ).fetchall()
+    return [(wt, d, m, round(avg, 1), cnt) for wt, d, m, avg, cnt in rows]

@@ -11,13 +11,14 @@ import datetime
 import logging
 import sys
 
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 import config as config_module
 import db
 import handlers
 import jobs
 import menu as menu_module
+import ratings
 import reports
 
 logging.basicConfig(
@@ -56,6 +57,11 @@ def main() -> None:
     application.add_handler(CommandHandler("reloadmenu", handlers.reloadmenu_command))
     application.add_handler(CommandHandler("reports", handlers.reports_command))
     application.add_handler(CommandHandler("resolve", handlers.resolve_command))
+    application.add_handler(CommandHandler("stats", handlers.stats_command))
+
+    application.add_handler(
+        CallbackQueryHandler(ratings.handle_rating_callback, pattern=rf"^{ratings.CALLBACK_PREFIX}\|")
+    )
 
     # Any non-command private text message is a menu-correction report.
     application.add_handler(

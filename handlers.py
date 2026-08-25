@@ -1,7 +1,6 @@
 """Telegram command handlers (/start, /menu, /reloadmenu, /reports, /stats, /resolve).
 
-Phases 1-3 implement /start, /menu, /reloadmenu, /reports, /resolve.
-/stats is added in phase 4, per SPEC.md §3/§9.
+Phases 1-4 implement all six commands, per SPEC.md §3/§9.
 """
 
 from __future__ import annotations
@@ -142,3 +141,35 @@ async def resolve_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.effective_message.reply_text(f"Report #{report_id} marked resolved.")
     else:
         await update.effective_message.reply_text(f"No report with id {report_id}.")
+
+
+def _format_slot_line(row: tuple[str, str, str, float, int]) -> str:
+    week_type, day, meal, avg, count = row
+    return f"{week_type} {day} {meal} — {avg}/5 ({count} ratings)"
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message is None:
+        return
+
+    cfg = context.application.bot_data["config"]
+    if not _is_dm(update) or not _is_admin(update, cfg):
+        return
+
+    conn = context.application.bot_data["db"]
+    rated_slots = db.distinct_rated_slot_count(conn)
+    ranked = db.slot_averages_ranked(conn)
+
+    lines = [f"Calibration: {rated_slots}/{menu_module.TOTAL_SLOTS} slots rated"]
+
+    if ranked:
+        top5 = ranked[:5]
+        bottom5 = list(reversed(ranked[-5:]))
+        lines.append("\nHighest rated:")
+        lines.extend(f"{i+1}. {_format_slot_line(row)}" for i, row in enumerate(top5))
+        lines.append("\nLowest rated:")
+        lines.extend(f"{i+1}. {_format_slot_line(row)}" for i, row in enumerate(bottom5))
+    else:
+        lines.append("\nNo ratings yet.")
+
+    await update.effective_message.reply_text("\n".join(lines))
