@@ -1,0 +1,18 @@
+[Unit]
+Description=Mess Menu Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=menubot
+WorkingDirectory=/opt/menubot
+EnvironmentFile=/opt/menubot/.env
+ExecStart=/opt/menubot/.venv/bin/python /opt/menubot/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
