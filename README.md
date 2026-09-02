@@ -17,11 +17,13 @@ Requires Node.js 20+.
 ```bash
 git clone <repo> menubot && cd menubot
 npm install
-cp .env.example .env && $EDITOR .env       # fill in real values (see below)
+cp .env.example .env && $EDITOR .env       # fill in WHATSAPP_ADMIN_JID at least — see below
 npm run dev                                 # tsx src/bot.ts, no build step
 ```
 
 Build locally against a **separate WhatsApp number** in a private test group. Never develop against the live group.
+
+`WHATSAPP_GROUP_JID` can't be known before the bot has connected once, so the first run only needs `WHATSAPP_ADMIN_JID` set — see the bootstrap order below.
 
 ### First run: linking the WhatsApp session
 
@@ -34,11 +36,17 @@ The session is then cached under `auth/` (gitignored — treat it like a credent
 
 ### Getting `WHATSAPP_GROUP_JID`
 
-Add the bot number to the target group first (private test group, then later the live one). Then, with the bot running, send any message in that group — the bot logs the JID of every chat it receives a message from at startup (check `journalctl`/stdout for an `incoming message` log line, or temporarily log `msg.key.remoteJid` in `src/bot.ts`'s message handler). Group JIDs look like `1234567890-1234567890@g.us`.
+With `WHATSAPP_GROUP_JID` still empty, the bot runs fine and responds to DMs, but logs a warning and skips every menu-post/rating-prompt job (there's nowhere configured to post to yet). To fill it in:
+
+1. Leave the bot running (QR already scanned).
+2. Add the bot number to the target group (private test group first, then later the live one).
+3. Send any message in that group.
+4. Watch the logs (stdout, or `journalctl -u menubot -f` in production) for a line like `"msg":"Incoming message.","chatJid":"1234567890-1234567890@g.us","isGroup":true` — that `chatJid` is your `WHATSAPP_GROUP_JID`.
+5. Set it in `.env` and restart the bot.
 
 ### Getting `WHATSAPP_ADMIN_JID`
 
-The repo owner's own WhatsApp number, in E.164 digits (no `+`, no spaces), suffixed with `@s.whatsapp.net` — e.g. `919876543210@s.whatsapp.net`.
+The repo owner's own WhatsApp number, in E.164 digits (no `+`, no spaces), suffixed with `@s.whatsapp.net` — e.g. `919876543210@s.whatsapp.net`. Required from the first run (admin commands and report forwarding depend on it).
 
 ### `.env` values
 

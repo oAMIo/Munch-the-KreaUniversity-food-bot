@@ -14,7 +14,12 @@ export const MEAL_NAMES = ["breakfast", "lunch", "snack", "dinner"] as const;
 export type MealName = (typeof MEAL_NAMES)[number];
 
 // Env vars that must always be present, regardless of llm.enabled.
-const REQUIRED_ENV_VARS = ["WHATSAPP_GROUP_JID", "WHATSAPP_ADMIN_JID"] as const;
+// WHATSAPP_GROUP_JID is deliberately NOT required: it can only be known
+// once the bot has connected once and seen a message from the group, so
+// requiring it up front would make first-run setup impossible. It's
+// validated as optional below; jobs.registerJobs skips group-posting jobs
+// and logs a warning if it's unset.
+const REQUIRED_ENV_VARS = ["WHATSAPP_ADMIN_JID"] as const;
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -45,7 +50,8 @@ export interface RatingsConfig {
 
 export interface Config {
   // From .env
-  whatsappGroupJid: string;
+  // null until the group JID is known and set (see REQUIRED_ENV_VARS above).
+  whatsappGroupJid: string | null;
   whatsappAdminJid: string;
   deepseekApiKey: string | null;
   dbPath: string;
@@ -199,7 +205,7 @@ export function loadConfig(envPath = ".env"): Config {
     requireEnv(name);
   }
 
-  const whatsappGroupJid = requireEnv("WHATSAPP_GROUP_JID");
+  const whatsappGroupJid = (process.env.WHATSAPP_GROUP_JID ?? "").trim() || null;
   const whatsappAdminJid = requireEnv("WHATSAPP_ADMIN_JID");
   const deepseekApiKey = (process.env.DEEPSEEK_API_KEY ?? "").trim() || null;
   const dbPath = process.env.DB_PATH ?? "menubot.db";

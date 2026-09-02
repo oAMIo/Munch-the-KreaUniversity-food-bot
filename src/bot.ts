@@ -170,6 +170,16 @@ async function handleIncomingMessage(
   msg: WAMessage,
 ): Promise<void> {
   try {
+    // Logged unconditionally (any message, any content type) so the group
+    // JID can be discovered by sending anything in the group once the bot
+    // is a member — see README "Getting WHATSAPP_GROUP_JID".
+    if (msg.key.remoteJid) {
+      logger.info(
+        { chatJid: msg.key.remoteJid, isGroup: msg.key.remoteJid.endsWith("@g.us") },
+        "Incoming message.",
+      );
+    }
+
     const incoming = parseIncoming(msg);
     if (incoming === null || !incoming.text) return;
 

@@ -170,7 +170,7 @@ CONFIG_PATH=config.yaml
 AUTH_DIR=auth
 ```
 
-`WHATSAPP_GROUP_JID` is the group's WhatsApp JID, e.g. `1234567890-1234567890@g.us` (see README for how to obtain it). `WHATSAPP_ADMIN_JID` is the repo owner's own WhatsApp JID, e.g. `919876543210@s.whatsapp.net` (E.164 digits, no `+`, suffixed `@s.whatsapp.net`). `AUTH_DIR` is where the Baileys linked-device session is cached (SPEC.md §5.0) — never commit it, it's equivalent to a login session. Startup must fail immediately with a clear message if `WHATSAPP_GROUP_JID` or `WHATSAPP_ADMIN_JID` is missing (`DEEPSEEK_API_KEY` is only required if `llm.enabled` is true).
+`WHATSAPP_GROUP_JID` is the group's WhatsApp JID, e.g. `1234567890-1234567890@g.us`. It is **not** required at startup — it cannot be known before the bot has connected once and seen a message from the group (SPEC.md §5.0.1), so it is validated as optional and defaults to unset. `WHATSAPP_ADMIN_JID` is the repo owner's own WhatsApp JID, e.g. `919876543210@s.whatsapp.net` (E.164 digits, no `+`, suffixed `@s.whatsapp.net`), and **is** required at startup. `AUTH_DIR` is where the Baileys linked-device session is cached (SPEC.md §5.0) — never commit it, it's equivalent to a login session. Startup must fail immediately with a clear message if `WHATSAPP_ADMIN_JID` is missing (`DEEPSEEK_API_KEY` is only required if `llm.enabled` is true). While `WHATSAPP_GROUP_JID` is unset, the bot still connects and answers DMs, but every menu-post/rating-prompt job fire is skipped and logged as a warning.
 
 ---
 
@@ -179,6 +179,10 @@ AUTH_DIR=auth
 ### 5.0 WhatsApp session
 
 The bot connects as the dedicated WhatsApp number via Baileys' multi-file auth state (`useMultiFileAuthState(AUTH_DIR)`). On first run (no session cached yet) it prints a QR code to stdout; the owner scans it once from that number's WhatsApp app (Settings → Linked Devices). The session persists in `AUTH_DIR` across restarts and is never committed to git. A logged-out session requires deleting `AUTH_DIR` and re-scanning.
+
+#### 5.0.1 Bootstrapping `WHATSAPP_GROUP_JID`
+
+`WHATSAPP_GROUP_JID` cannot be known before the bot has connected once — it's the JID of a group the owner hasn't necessarily added the bot to yet. So it is not in the startup-required env vars (only `WHATSAPP_ADMIN_JID` is); the bot must start and connect fine with it unset. Every incoming message is logged with its `chatJid` regardless of content type, so the owner can add the bot to the group, send any message, and read the JID off the log. Until `WHATSAPP_GROUP_JID` is set, `jobs.registerJobs` still registers the cron jobs (so a later restart isn't required for the schedule itself), but `postMenuJob`/`ratingPromptJob` must check for it and skip with a logged warning on every fire, rather than throwing.
 
 ### 5.1 Meal slot identity
 

@@ -54,6 +54,10 @@ export function buildMenuMessage(
 /** Post today's menu for one meal, if there is one and it isn't already posted. */
 export async function postMenuJob(state: AppState, meal: MealName): Promise<void> {
   const { config: cfg, db: dbConn, menu: menuData, weekAnchorDate, sock } = state;
+  if (!cfg.whatsappGroupJid) {
+    logger.warn(`Skipping ${meal} menu post: WHATSAPP_GROUP_JID is not set yet. See README "Getting WHATSAPP_GROUP_JID".`);
+    return;
+  }
   try {
     const today = localToday(cfg.timezone);
     const todayIso = today.toISOString().slice(0, 10);
@@ -97,6 +101,10 @@ export async function postMenuJob(state: AppState, meal: MealName): Promise<void
 /** Post a rating prompt poll (1..scaleMax) for one meal. */
 export async function ratingPromptJob(state: AppState, meal: MealName): Promise<void> {
   const { config: cfg, db: dbConn, menu: menuData, weekAnchorDate, sock } = state;
+  if (!cfg.whatsappGroupJid) {
+    logger.warn(`Skipping ${meal} rating prompt: WHATSAPP_GROUP_JID is not set yet. See README "Getting WHATSAPP_GROUP_JID".`);
+    return;
+  }
   try {
     const today = localToday(cfg.timezone);
     const todayIso = today.toISOString().slice(0, 10);
@@ -133,6 +141,14 @@ function hhmmToCron(hhmm: string): string {
 /** Register the daily menu-post and rating-prompt cron jobs for each of the four meals. */
 export function registerJobs(state: AppState): void {
   const { config: cfg } = state;
+
+  if (!cfg.whatsappGroupJid) {
+    logger.warn(
+      "WHATSAPP_GROUP_JID is not set — menu-post and rating-prompt jobs are registered but will skip every " +
+        'fire until it is. Add the bot number to your group, send a message there, note the JID logged for ' +
+        'that incoming message, set WHATSAPP_GROUP_JID in .env, and restart. See README "Getting WHATSAPP_GROUP_JID".',
+    );
+  }
 
   for (const meal of Object.keys(cfg.meals) as MealName[]) {
     const mealCfg: MealConfig = cfg.meals[meal];
