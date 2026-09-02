@@ -1,4 +1,4 @@
-# Mess Menu Telegram Bot — Build Specification
+# Mess Menu WhatsApp Bot — Build Specification
 
 **Status:** Authoritative. This document is the single source of truth for what gets built.
 
@@ -8,14 +8,16 @@
 
 ## 1. What this bot does
 
-A Telegram bot that lives in a university group chat and:
+A WhatsApp bot (via Baileys, run from a dedicated WhatsApp number) that lives in a university group chat and:
 
 1. Posts the day's menu before each of the four daily meal windows (breakfast, lunch, snack, dinner).
-2. Posts a rating prompt after each meal window closes, collecting 1–5 ratings via inline keyboard buttons.
+2. Posts a rating prompt after each meal window closes, collecting 1–5 ratings via a native WhatsApp poll.
 3. Accepts direct messages from users reporting that a posted menu was wrong, and stores those reports for the admin.
 4. Once every meal slot in the menu cycle has been rated at least once, starts including historical average ratings in the daily menu posts.
 
 The menu is a two-week cycle (an **even week** and an **odd week**) that the repo owner hand-authors as a YAML file roughly every two months.
+
+**History:** this was originally built as a Telegram bot in Python (`python-telegram-bot`); that implementation is preserved, unmaintained, under `legacy/`. It was ported to WhatsApp because Baileys — the WhatsApp Web protocol library used here — has no Python binding, so the port is also a language change (Python → Node/TypeScript). Every other design decision in this spec carries over from the original unchanged unless a section below says otherwise.
 
 ---
 
@@ -23,17 +25,17 @@ The menu is a two-week cycle (an **even week** and an **odd week**) that the rep
 
 | Concern | Choice |
 |---|---|
-| Language | Python 3.11+ |
-| Telegram library | `python-telegram-bot` v21+ (async API) |
-| Scheduling | `python-telegram-bot`'s built-in `JobQueue` (`application.job_queue.run_daily`). Do **not** add a separate `APScheduler`, `schedule`, `celery`, or `cron` layer. PTB's JobQueue is APScheduler under the hood; one scheduler only. |
-| Database | SQLite via the Python standard-library `sqlite3` module. No ORM. No SQLAlchemy. |
-| Menu storage | A YAML file, parsed with `PyYAML` (`yaml.safe_load`) |
-| Config | A YAML file, parsed with `PyYAML` |
-| Secrets | Environment variables loaded from a `.env` file via `python-dotenv` |
-| LLM | DeepSeek API (OpenAI-compatible) via the official `openai` Python SDK, pointed at `base_url="https://api.deepseek.com"` |
-| Process management | `systemd` on the target VPS |
+| Language | Node.js 20+ LTS, TypeScript |
+| WhatsApp library | `@whiskeysockets/baileys` (maintained Baileys fork), connected as the dedicated bot number via a linked-device (QR code) session |
+| Scheduling | `node-cron`. Do **not** add a separate scheduler library or a system `cron` layer — one scheduler only. |
+| Database | SQLite via `better-sqlite3` (synchronous API). No ORM. |
+| Menu storage | A YAML file, parsed with `js-yaml` |
+| Config | A YAML file, parsed with `js-yaml` |
+| Secrets | Environment variables loaded from a `.env` file via `dotenv` |
+| LLM | DeepSeek API (OpenAI-compatible) via the official `openai` npm SDK, pointed at `baseURL: "https://api.deepseek.com"` |
+| Process management | `systemd` on the target VPS, running the `tsc`-compiled `dist/bot.js` |
 
-`requirements.txt` must pin these and nothing else beyond their transitive dependencies.
+`package.json` must pin these and nothing else beyond their transitive dependencies. Build with `npm run build` (`tsc`); do not add a bundler.
 
 ---
 
@@ -41,27 +43,31 @@ The menu is a two-week cycle (an **even week** and an **odd week**) that the rep
 
 ```
 menubot/
-├── bot.py                  # entrypoint: builds the Application, registers handlers + jobs, runs polling
-├── config.py               # loads config.yaml + .env, exposes a Config object
-├── menu.py                 # loads/reloads menu.yaml, resolves "what is today's menu"
-├── db.py                   # all SQLite access: schema creation + every query function
-├── ratings.py              # rating prompt construction, callback handling, coverage calibration, averages
-├── reports.py              # DM report handling
-├── llm.py                  # the deepseek phrasing pass
-├── handlers.py             # Telegram command handlers (/start, /menu, /reloadmenu, /reports, /stats)
-├── jobs.py                 # the scheduled job functions (menu post, rating prompt) + job registration
+├── src/
+│   ├── bot.ts            # entrypoint: connects Baileys, registers the message dispatcher + jobs
+│   ├── config.ts         # loads config.yaml + .env, exposes a Config object
+│   ├── menu.ts           # loads/reloads menu.yaml, resolves "what is today's menu"
+│   ├── time.ts           # timezone-aware date/time helpers (config.timezone via Intl, never a naive `new Date()`)
+│   ├── db.ts             # all SQLite access: schema creation + every query function
+│   ├── ratings.ts        # rating-poll construction, vote handling, coverage calibration, averages
+│   ├── reports.ts        # DM report handling
+│   ├── llm.ts            # the deepseek phrasing pass
+│   ├── handlers.ts       # WhatsApp text-command handlers (/start, /menu, /reloadmenu, /reports, /resolve, /stats)
+│   ├── jobs.ts           # the scheduled job functions (menu post, rating prompt) + job registration
+│   └── logger.ts         # structured stdout logging (pino)
 ├── menu.yaml               # the menu data (hand-authored by the repo owner)
 ├── config.yaml             # non-secret configuration
 ├── .env.example            # template for secrets — never commit a real .env
-├── requirements.txt
+├── package.json, tsconfig.json
 ├── AGENTS.md
 ├── SPEC.md                 # this file
 ├── README.md               # short: what it is, how to run locally, how to deploy
+├── legacy/                 # the original Telegram/Python implementation — preserved, unmaintained
 └── deploy/
     └── menubot.service     # the systemd unit file
 ```
 
-Do not create additional modules, packages, or subdirectories. Do not restructure into `src/`.
+Do not create additional modules or subdirectories under `src/`. Do not restructure into `src/lib/`, `src/services/`, etc.
 
 ---
 
@@ -155,20 +161,24 @@ Every one of these values must be read from config at runtime. **No magic number
 ### 4.3 `.env.example`
 
 ```
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_GROUP_CHAT_ID=
-ADMIN_USER_ID=
+WHATSAPP_GROUP_JID=
+WHATSAPP_ADMIN_JID=
 DEEPSEEK_API_KEY=
 DB_PATH=menubot.db
 MENU_PATH=menu.yaml
 CONFIG_PATH=config.yaml
+AUTH_DIR=auth
 ```
 
-`TELEGRAM_GROUP_CHAT_ID` is the numeric chat ID of the group (negative for supergroups). `ADMIN_USER_ID` is the numeric Telegram user ID of the repo owner. Startup must fail immediately with a clear message if any of the first four are missing (`DEEPSEEK_API_KEY` is only required if `llm.enabled` is true).
+`WHATSAPP_GROUP_JID` is the group's WhatsApp JID, e.g. `1234567890-1234567890@g.us` (see README for how to obtain it). `WHATSAPP_ADMIN_JID` is the repo owner's own WhatsApp JID, e.g. `919876543210@s.whatsapp.net` (E.164 digits, no `+`, suffixed `@s.whatsapp.net`). `AUTH_DIR` is where the Baileys linked-device session is cached (SPEC.md §5.0) — never commit it, it's equivalent to a login session. Startup must fail immediately with a clear message if `WHATSAPP_GROUP_JID` or `WHATSAPP_ADMIN_JID` is missing (`DEEPSEEK_API_KEY` is only required if `llm.enabled` is true).
 
 ---
 
 ## 5. Core logic
+
+### 5.0 WhatsApp session
+
+The bot connects as the dedicated WhatsApp number via Baileys' multi-file auth state (`useMultiFileAuthState(AUTH_DIR)`). On first run (no session cached yet) it prints a QR code to stdout; the owner scans it once from that number's WhatsApp app (Settings → Linked Devices). The session persists in `AUTH_DIR` across restarts and is never committed to git. A logged-out session requires deleting `AUTH_DIR` and re-scanning.
 
 ### 5.1 Meal slot identity
 
@@ -183,40 +193,43 @@ if (current_week - anchor_week) % 2 == 0:  week_type = "odd_week"
 else:                                      week_type = "even_week"
 ```
 
-Use `datetime.date.isocalendar()`. Implement this in exactly one function, `menu.resolve_week_type(today)`, and call it everywhere. Do not reimplement it inline.
+Implement this in exactly one function, `menu.resolveWeekType(today, weekAnchorDate)`, and call it everywhere. Do not reimplement it inline.
 
 ⚠️ ISO week numbers reset across year boundaries. Compute the parity from a **continuous** count, not the raw week number: derive it from the number of whole weeks between the anchor's ISO-week Monday and the current ISO-week Monday. Write a unit-testable pure function.
 
 ### 5.3 Getting today's menu
 
-`menu.get_menu(date, meal) -> list[str]` — resolves week type, resolves lowercase weekday name, returns the dish list. Raises if the slot is missing.
+`menu.getMenu(menu, today, weekAnchorDate, meal) -> string[]` — resolves week type, resolves lowercase weekday name, returns the dish list. Throws if the slot is missing.
 
 ### 5.4 Menu posting job
 
-For each meal, a daily job at `meals.<meal>.post_at` that:
+For each meal, a daily cron job at `meals.<meal>.post_at` that:
 
 1. Resolves today's slot and dish list.
 2. If the dish list is empty, posts nothing and logs it. (Do not post "no menu today".)
 3. Builds a deterministic base message (see §6).
 4. If `llm.enabled`, passes it through the phrasing pass (§7). If the LLM call fails for any reason, **fall back to the deterministic message** and log the error. Never let an LLM failure block the post.
-5. Sends to `TELEGRAM_GROUP_CHAT_ID`.
+5. Sends to `WHATSAPP_GROUP_JID`.
 
 ### 5.5 Rating prompt job
 
-For each meal, a daily job at `meals.<meal>.rate_at` that:
+For each meal, a daily cron job at `meals.<meal>.rate_at` that:
 
 1. Resolves today's slot. If the dish list was empty, skip.
-2. Sends a message to the group with an inline keyboard: buttons `1` … `scale_max`.
-3. Callback data format: `rate|{iso_date}|{week_type}|{day}|{meal}|{score}`. Parse defensively; ignore malformed callbacks.
+2. Sends a **native WhatsApp poll message** to the group: question = the rating-prompt text (§6), single-select options `"1"` … `"{scale_max}"`.
+3. Registers the sent poll's message id in the `poll_votes` table, mapped to `(date, week_type, day, meal, scale_max)` — this is the WhatsApp-adapted replacement for Telegram's `rate|{iso_date}|{week_type}|{day}|{meal}|{score}` callback_data, since a poll option carries no payload of its own. Also keeps the full poll message in memory (needed to decrypt later votes; see §5.6).
 
-### 5.6 Rating callback handling
+### 5.6 Rating vote handling
 
-On `callback_query`:
+On a `messages.update` event carrying `pollUpdates` (one `proto.IPollUpdate` per vote):
 
-1. Parse the callback data.
-2. `INSERT ... ON CONFLICT(date, meal, user_id) DO UPDATE SET score = excluded.score` — a user may change their rating for a given meal on a given day, but only ever holds one.
-3. Answer the callback query with a short toast confirming the score (e.g. "Rated 4/5 — thanks!"). Do **not** post a new group message per rating; that would spam the chat.
-4. Never reveal who rated what in the group.
+1. Look up the vote's poll message id in `poll_votes`. If not found (not one of our rating polls, or from before this process started), ignore it.
+2. Feed the vote into Baileys' `updateMessageWithPollUpdate` against the in-memory poll message, then re-aggregate with `getAggregateVotesInPollMessage` to get the current per-option voter list.
+3. For each option/voter pair: `INSERT ... ON CONFLICT(date, meal, user_id) DO UPDATE SET score = excluded.score` — a user may change their vote for a given meal on a given day, but only ever holds one rating.
+4. Never post a new group message per vote — WhatsApp polls already keep votes silent by design, so this is a purely silent DB write (no per-vote toast exists on WhatsApp the way Telegram's callback-answer toast did).
+5. Never reveal who rated what in the group.
+
+⚠️ The in-memory poll-message cache does not survive a restart: a poll posted before a restart can no longer register new votes after the process comes back up (Baileys needs the original poll message object, not just its id, to decrypt). This is a known limitation of the WhatsApp port with no equivalent in the Telegram version, where callback_data was self-contained.
 
 ### 5.7 Calibration
 
@@ -236,11 +249,11 @@ Until calibrated, menu posts contain **no** rating information at all. After cal
 
 ### 5.9 Report handling
 
-Any **private** (non-group) text message to the bot that is not a command is treated as a menu-correction report:
+Any **private** (non-group; a JID ending `@s.whatsapp.net` rather than `@g.us`) text message to the bot that is not a command is treated as a menu-correction report:
 
-1. Insert into `reports` with user id, username, message text, timestamp, `resolved = 0`.
-2. Reply to the user confirming receipt.
-3. Forward a copy to `ADMIN_USER_ID` as a DM.
+1. Insert into `reports` with sender JID, pushname, message text, timestamp, `resolved = 0`.
+2. Reply to the sender confirming receipt.
+3. Forward a copy to `WHATSAPP_ADMIN_JID` as a DM.
 
 ---
 
@@ -263,13 +276,15 @@ If calibrated, append:
 ★ {avg}/5 from {n} ratings
 ```
 
-Rating prompt message:
+Rating prompt: a native WhatsApp poll (§5.5) whose question text is:
 
 ```
 How was {label} today? Tap to rate.
 ```
 
-Use Telegram HTML parse mode. Escape dish names — they come from a hand-edited file and may contain `&`, `<`, `>`.
+and whose options are `"1"` … `"{scale_max}"`.
+
+Use WhatsApp's plain-text markup (`*bold*` for the header) instead of Telegram HTML — no escaping is needed for dish names, since WhatsApp text has no markup-injection risk the way Telegram's HTML parse mode did.
 
 ---
 
@@ -278,7 +293,7 @@ Use Telegram HTML parse mode. Escape dish names — they come from a hand-edited
 This is the **only** place an LLM is used at runtime. Its job is presentation, nothing else.
 
 - Model, `max_tokens`, and persona come from `config.yaml`.
-- Call made via the `openai` SDK's `OpenAI(api_key=..., base_url="https://api.deepseek.com")` client (DeepSeek's API is OpenAI-compatible; there is no dedicated DeepSeek SDK).
+- Call made via the `openai` npm SDK's `new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" })` client (DeepSeek's API is OpenAI-compatible; there is no dedicated DeepSeek SDK).
 - System prompt must instruct the model, in substance:
   - Rewrite the given menu announcement in the given persona.
   - **Reproduce every dish name exactly as given. Never add, remove, rename, translate, or invent a dish.**
@@ -293,7 +308,7 @@ The LLM must never be asked what the menu is, never be given the database, and n
 
 ## 8. Database schema
 
-Create on startup with `CREATE TABLE IF NOT EXISTS`. Exactly these three tables:
+Create on startup with `CREATE TABLE IF NOT EXISTS`. Exactly these four tables:
 
 ```sql
 CREATE TABLE IF NOT EXISTS ratings (
@@ -302,7 +317,7 @@ CREATE TABLE IF NOT EXISTS ratings (
     week_type  TEXT    NOT NULL,   -- 'even_week' | 'odd_week'
     day        TEXT    NOT NULL,   -- 'monday' ... 'sunday'
     meal       TEXT    NOT NULL,   -- 'breakfast' | 'lunch' | 'snack' | 'dinner'
-    user_id    INTEGER NOT NULL,
+    user_id    TEXT    NOT NULL,   -- voter's WhatsApp JID
     score      INTEGER NOT NULL,
     created_at TEXT    NOT NULL,
     UNIQUE(date, meal, user_id)
@@ -312,7 +327,7 @@ CREATE INDEX IF NOT EXISTS idx_ratings_slot ON ratings(week_type, day, meal);
 
 CREATE TABLE IF NOT EXISTS reports (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL,
+    user_id    TEXT    NOT NULL,   -- reporter's WhatsApp JID
     username   TEXT,
     message    TEXT    NOT NULL,
     created_at TEXT    NOT NULL,
@@ -323,9 +338,22 @@ CREATE TABLE IF NOT EXISTS state (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- WhatsApp-specific: maps an open rating poll's message id back to the
+-- slot it was asking about (§5.5/§5.6) — the replacement for Telegram's
+-- self-contained callback_data, since a poll option carries no payload.
+CREATE TABLE IF NOT EXISTS poll_votes (
+    poll_message_id TEXT PRIMARY KEY,
+    date            TEXT    NOT NULL,
+    week_type       TEXT    NOT NULL,
+    day             TEXT    NOT NULL,
+    meal            TEXT    NOT NULL,
+    scale_max       INTEGER NOT NULL,
+    created_at      TEXT    NOT NULL
+);
 ```
 
-All SQL lives in `db.py`. No SQL strings anywhere else in the codebase. Use parameterised queries exclusively.
+All SQL lives in `db.ts`. No SQL strings anywhere else in the codebase. Use parameterised queries exclusively.
 
 ---
 
@@ -340,29 +368,29 @@ All SQL lives in `db.py`. No SQL strings anywhere else in the codebase. Use para
 | `/resolve <id>` | DM | admin only | Marks a report resolved. |
 | `/stats` | DM | admin only | Calibration progress (`n/56 slots rated`) and the five highest- and lowest-rated slots. |
 
-Admin-only commands must check `update.effective_user.id == ADMIN_USER_ID` and silently ignore (or politely refuse) otherwise.
+Admin-only commands must check `senderJid === WHATSAPP_ADMIN_JID` and silently ignore (or politely refuse) otherwise. WhatsApp has no slash-command framework — these are dispatched by plain-text prefix matching on incoming messages.
 
 ---
 
 ## 10. Operational requirements
 
-- **Logging:** use the stdlib `logging` module to stdout at INFO. systemd captures it into the journal. Log every scheduled post, every reload, every LLM fallback, every report. Never log the bot token or API key.
-- **Timezone:** every date/time operation must use `config.timezone` via `zoneinfo.ZoneInfo`. Never use naive `datetime.now()`.
-- **Crash safety:** the bot must survive a malformed callback, a Telegram API error, or an LLM outage without exiting. Scheduled jobs must each catch their own exceptions.
+- **Logging:** structured logging to stdout at INFO (`pino`). systemd captures it into the journal. Log every scheduled post, every reload, every LLM fallback, every report. Never log the WhatsApp session contents or the API key.
+- **Timezone:** every date/time operation must use `config.timezone` via the `Intl` helpers in `time.ts`. Never use a naive `new Date()` for "what is today"/"what time is it".
+- **Crash safety:** the bot must survive a malformed poll vote, a WhatsApp connection drop, or an LLM outage without exiting. Scheduled jobs must each catch their own exceptions. A dropped connection should attempt reconnection unless the session was explicitly logged out.
 - **Idempotency:** the menu-post job must not double-post if it somehow fires twice. Track the last posted `(date, meal)` in the `state` table and skip if already posted.
-- **Startup:** validate config, validate menu, connect DB, register handlers, register the 8 daily jobs, then start polling. Fail fast and loudly on any validation error.
+- **Startup:** validate config, validate menu, connect DB, connect WhatsApp (§5.0), register the message dispatcher, register the 8 daily jobs, then run. Fail fast and loudly on any validation error.
 
 ---
 
 ## 11. Deployment
 
-Build locally against a **separate test bot** (a second bot from @BotFather) in a private test group. Never develop against the live group.
+Build locally against a **separate WhatsApp number** in a private test group. Never develop against the live group.
 
 `deploy/menubot.service`:
 
 ```ini
 [Unit]
-Description=Mess Menu Telegram Bot
+Description=Mess Menu WhatsApp Bot
 After=network-online.target
 Wants=network-online.target
 
@@ -371,7 +399,7 @@ Type=simple
 User=menubot
 WorkingDirectory=/opt/menubot
 EnvironmentFile=/opt/menubot/.env
-ExecStart=/opt/menubot/.venv/bin/python /opt/menubot/bot.py
+ExecStart=/usr/bin/node /opt/menubot/dist/bot.js
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -385,14 +413,15 @@ WantedBy=multi-user.target
 
 ```bash
 git clone <repo> /opt/menubot && cd /opt/menubot
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env && $EDITOR .env        # fill in real values
+npm install
+npm run build                                # compiles src/ -> dist/
+cp .env.example .env && $EDITOR .env         # fill in real values
 sudo cp deploy/menubot.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now menubot
-journalctl -u menubot -f                     # verify
+journalctl -u menubot -f                     # verify — scan the printed QR code on first run
 ```
 
-Update loop: `git pull && sudo systemctl restart menubot`
+Update loop: `git pull && npm install && npm run build && sudo systemctl restart menubot`
 Menu-only update: edit `menu.yaml`, then DM the bot `/reloadmenu` — **no restart**.
 
 ---
@@ -401,12 +430,12 @@ Menu-only update: edit `menu.yaml`, then DM the bot `/reloadmenu` — **no resta
 
 Implement in this order, and make the repo runnable at the end of each phase.
 
-1. **Skeleton** — `config.py`, `.env` loading, `menu.py` with loader + validation + `resolve_week_type`, placeholder `menu.yaml`. A `bot.py` that starts, validates, connects to Telegram, and responds to `/start`.
-2. **Menu posting** — `db.py` schema, `jobs.py` menu-post job registered for all four meals, `/menu` command, idempotency guard. No LLM yet — deterministic messages only.
-3. **Reports** — `reports.py`, DM handler, `/reports`, `/resolve`, admin forwarding.
-4. **Ratings** — rating-prompt job, inline keyboard, callback handler, upsert, `/stats`.
+1. **Skeleton** — `config.ts`, `.env` loading, `menu.ts` with loader + validation + `resolveWeekType`, placeholder `menu.yaml`. A `bot.ts` that starts, validates, connects to WhatsApp (QR pairing), and responds to `/start`.
+2. **Menu posting** — `db.ts` schema, `jobs.ts` menu-post job registered for all four meals, `/menu` command, idempotency guard. No LLM yet — deterministic messages only.
+3. **Reports** — `reports.ts`, DM handler, `/reports`, `/resolve`, admin forwarding.
+4. **Ratings** — rating-prompt poll job, vote handling, upsert, `/stats`.
 5. **Calibration + averages** — coverage query, `state` flag, averages appended to menu posts.
-6. **LLM pass** — `llm.py`, the verification check, the fallback path, wired into the menu-post job last.
+6. **LLM pass** — `llm.ts`, the verification check, the fallback path, wired into the menu-post job last.
 7. **Deploy artefacts** — `menubot.service`, `README.md`.
 
 ---

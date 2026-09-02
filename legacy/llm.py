@@ -28,15 +28,18 @@ def _build_system_prompt(persona: str) -> str:
         "You rewrite a mess-menu announcement for a university group chat, in this persona: "
         f"{persona}\n\n"
         "Rules:\n"
-        "- Reproduce every dish name exactly as given in the message. Never add, remove, "
-        "rename, translate, or invent a dish.\n"
-        "- Keep the rewritten announcement under about 40 words, plus the dish list.\n"
+        "- Keep every dish as its own separate bullet point. Never merge, combine, or abbreviate "
+        "two dishes into one line.\n"
+        "- Reproduce every dish name exactly as given — same spelling, same capitalisation. "
+        "Never add, remove, rename, translate, or invent a dish.\n"
+        "- Keep the rewritten intro under about 40 words; the dish list follows unchanged.\n"
         "- Return only the message text. No preamble, no markdown fences, no explanations."
     )
 
 
 def _all_dishes_present(text: str, dishes: list[str]) -> bool:
-    return all(dish in text for dish in dishes)
+    text_lower = text.lower()
+    return all(dish.lower() in text_lower for dish in dishes)
 
 
 async def phrase_menu_message(

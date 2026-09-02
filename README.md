@@ -1,59 +1,78 @@
 # Munch — Krea University mess menu bot
 
-A Telegram bot for a university group chat that:
+A WhatsApp bot (via Baileys) for a university group chat that:
 
 - Posts the day's mess menu before each of the four daily meal windows (breakfast, lunch, snack, dinner).
-- Posts a rating prompt after each meal window closes, collecting 1–5 ratings via inline buttons.
+- Posts a rating prompt after each meal window closes, collecting 1–5 ratings via a native WhatsApp poll.
 - Accepts DM reports when a posted menu was wrong, and forwards them to the admin.
 - Once every slot in the two-week menu cycle has been rated at least once, starts showing historical average ratings in the daily menu posts.
 - Optionally rephrases menu posts in a configurable persona via the DeepSeek API — always falling back to a plain deterministic message if that call fails or would alter a dish name.
 
-See `SPEC.md` for the full build specification and `AGENTS.md` for repository conventions.
+See `SPEC.md` for the full build specification and `AGENTS.md` for repository conventions. The original Telegram/Python implementation is preserved, unmaintained, under `legacy/`.
 
 ## Running locally
 
-Requires Python 3.11+.
+Requires Node.js 20+.
 
 ```bash
 git clone <repo> menubot && cd menubot
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt      # Windows: .venv\Scripts\pip install -r requirements.txt
-cp .env.example .env && $EDITOR .env           # fill in real values (see below)
-.venv/bin/python bot.py                        # Windows: .venv\Scripts\python bot.py
+npm install
+cp .env.example .env && $EDITOR .env       # fill in real values (see below)
+npm run dev                                 # tsx src/bot.ts, no build step
 ```
 
-Build locally against a **separate test bot** (a second bot from @BotFather) in a private test group. Never develop against the live group.
+Build locally against a **separate WhatsApp number** in a private test group. Never develop against the live group.
+
+### First run: linking the WhatsApp session
+
+On first run (no `auth/` folder yet), the bot prints a QR code to the terminal. From the **dedicated bot number's** phone:
+
+1. Open WhatsApp → Settings → Linked Devices → Link a Device.
+2. Scan the QR code printed in the terminal.
+
+The session is then cached under `auth/` (gitignored — treat it like a credential, it's equivalent to a login session for that number) and persists across restarts. You only need to re-scan if the session is explicitly logged out or invalidated.
+
+### Getting `WHATSAPP_GROUP_JID`
+
+Add the bot number to the target group first (private test group, then later the live one). Then, with the bot running, send any message in that group — the bot logs the JID of every chat it receives a message from at startup (check `journalctl`/stdout for an `incoming message` log line, or temporarily log `msg.key.remoteJid` in `src/bot.ts`'s message handler). Group JIDs look like `1234567890-1234567890@g.us`.
+
+### Getting `WHATSAPP_ADMIN_JID`
+
+The repo owner's own WhatsApp number, in E.164 digits (no `+`, no spaces), suffixed with `@s.whatsapp.net` — e.g. `919876543210@s.whatsapp.net`.
 
 ### `.env` values
 
 | Variable | Meaning |
 |---|---|
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather. |
-| `TELEGRAM_GROUP_CHAT_ID` | Numeric chat ID of the group (negative for supergroups). |
-| `ADMIN_USER_ID` | Numeric Telegram user ID of the repo owner. |
+| `WHATSAPP_GROUP_JID` | JID of the group the bot posts to (see above). |
+| `WHATSAPP_ADMIN_JID` | JID of the repo owner, used for admin commands and report forwarding. |
 | `DEEPSEEK_API_KEY` | DeepSeek API key. Required only if `llm.enabled: true` in `config.yaml`. |
 | `DB_PATH` | Path to the SQLite database file (default `menubot.db`). |
 | `MENU_PATH` | Path to `menu.yaml`. |
 | `CONFIG_PATH` | Path to `config.yaml`. |
+| `AUTH_DIR` | Folder for the cached WhatsApp session (default `auth`). |
 
-Non-secret behaviour (meal times, timezone, LLM persona/model, rating scale) lives in `config.yaml`. The menu itself lives in `menu.yaml` — see `SPEC.md` §4.1 for its exact required structure.
+Non-secret behaviour (meal times, timezone, LLM persona/model, rating scale) lives in `config.yaml`. The menu itself lives in `menu.yaml` — see `SPEC.md` §4.1 for its exact required structure. Both are unchanged from the original Telegram version.
 
 ## Deploying (systemd on a Linux VPS)
 
 ```bash
 git clone <repo> /opt/menubot && cd /opt/menubot
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env && $EDITOR .env        # fill in real values
+npm install
+npm run build                                # compiles src/ -> dist/
+cp .env.example .env && $EDITOR .env         # fill in real values
 sudo cp deploy/menubot.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now menubot
-journalctl -u menubot -f                     # verify
+journalctl -u menubot -f                     # verify — scan the printed QR code on first run
 ```
 
-**Update loop:** `git pull && sudo systemctl restart menubot`
+**Update loop:** `git pull && npm install && npm run build && sudo systemctl restart menubot`
 
 **Menu-only update:** edit `menu.yaml`, then DM the bot `/reloadmenu` — no restart needed. If the new file fails validation, the previously loaded menu stays active and the bot replies with the exact error.
 
 ## Commands
+
+Sent as plain WhatsApp text messages (WhatsApp has no native slash-command UI).
 
 | Command | Where | Who | Behaviour |
 |---|---|---|---|

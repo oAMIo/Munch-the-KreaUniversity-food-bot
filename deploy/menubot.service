@@ -1,5 +1,5 @@
 [Unit]
-Description=Mess Menu Telegram Bot
+Description=Mess Menu WhatsApp Bot
 After=network-online.target
 Wants=network-online.target
 
@@ -8,7 +8,7 @@ Type=simple
 User=menubot
 WorkingDirectory=/opt/menubot
 EnvironmentFile=/opt/menubot/.env
-ExecStart=/opt/menubot/.venv/bin/python /opt/menubot/bot.py
+ExecStart=/usr/bin/node /opt/menubot/dist/bot.js
 Restart=always
 RestartSec=10
 StandardOutput=journal

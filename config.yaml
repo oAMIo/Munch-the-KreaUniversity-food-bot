@@ -22,7 +22,7 @@ meals:
     rate_at: "18:30"
   dinner:
     label: "Dinner"
-    post_at: "19:30"
+    post_at: "19:00"
     rate_at: "21:30"
 
 llm:

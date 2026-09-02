@@ -1,5 +1,15 @@
 .env
-.venv/
-__pycache__/
-*.pyc
 *.db
+
+# Node
+node_modules/
+dist/
+
+# WhatsApp session (Baileys auth state) — never commit this, it's the
+# equivalent of a bot token/session cookie.
+auth/
+
+# Legacy Python bits, in case anyone reruns legacy/ locally
+legacy/.venv/
+legacy/__pycache__/
+legacy/*.pyc
