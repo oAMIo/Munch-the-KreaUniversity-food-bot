@@ -42,7 +42,127 @@ function parseIncoming(msg: WAMessage): IncomingMessage | null {
   return { chatJid, senderJid, senderName: msg.pushName ?? null, text: text.trim() };
 }
 
-async function dispatchCommand(sock: ReturnType<typeof makeWASocket>, state: AppState, incoming: IncomingMessage): Promise<void> {
+type Sock = ReturnType<typeof makeWASocket>;
+
+/** Everything a running connection needs to reconnect itself in place. */
+interface RunningState {
+  appState: AppState;
+  authDir: string;
+}
+
+// Disconnect codes WhatsApp itself sends when the *session* is no longer
+// valid, not just the socket. Reconnecting on these just spins in a loop
+// hammering WhatsApp's servers with the same dead credentials (risking a
+// rate-limit/ban) — they need a human: re-scan the QR code (loggedOut /
+// badSession / multideviceMismatch), or someone else linked this number
+// elsewhere (connectionReplaced). Everything else (network blips, restart
+// requests, WhatsApp's own periodic connectionClosed) is transient and
+// safe to retry automatically.
+const FATAL_DISCONNECT_CODES: ReadonlySet<number> = new Set([
+  DisconnectReason.loggedOut,
+  DisconnectReason.connectionReplaced,
+  DisconnectReason.badSession,
+  DisconnectReason.multideviceMismatch,
+]);
+
+const RECONNECT_DELAYS_SEC = [2, 5, 10, 20, 30, 60];
+let reconnectAttempt = 0;
+let reconnectTimer: NodeJS.Timeout | null = null;
+
+function scheduleReconnect(rs: RunningState): void {
+  if (reconnectTimer) return; // a reconnect is already queued
+  const delaySec = RECONNECT_DELAYS_SEC[Math.min(reconnectAttempt, RECONNECT_DELAYS_SEC.length - 1)];
+  reconnectAttempt += 1;
+  logger.info(`Reconnecting to WhatsApp in ${delaySec}s (attempt ${reconnectAttempt}).`);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    void connect(rs).catch((err) => {
+      logger.error({ err }, "Reconnect attempt failed to even establish a socket.");
+      scheduleReconnect(rs);
+    });
+  }, delaySec * 1000);
+}
+
+/**
+ * (Re-)establishes the WhatsApp socket for an already-built RunningState
+ * and wires its event handlers. Baileys sockets are single-use — closed
+ * ones can't be revived — so this is called once at startup and again on
+ * every reconnect, but it deliberately touches nothing else: no config
+ * reload, no DB reconnect, no `registerJobs`. Those used to happen on
+ * every reconnect (the old code re-ran the whole of `main()`), which
+ * meant every reconnect silently stacked a *second* set of cron jobs on
+ * top of the first — duplicate menu posts and rating prompts in the
+ * group after enough reconnects. Only `appState.sock` is swapped.
+ */
+async function connect(rs: RunningState): Promise<void> {
+  const { appState } = rs;
+  const cfg = appState.config;
+
+  const { state: authState, saveCreds } = await useMultiFileAuthState(rs.authDir);
+
+  logger.info("Connecting to WhatsApp.");
+  // Baileys' own log stream is very chatty at info level; give it our
+  // structured logger but pinned to 'warn' so only real problems surface.
+  const baileysLogger = logger.child({ module: "baileys" });
+  baileysLogger.level = "warn";
+  const sock = makeWASocket({
+    auth: authState,
+    logger: baileysLogger as never,
+    printQRInTerminal: false,
+  });
+  appState.sock = sock;
+
+  sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("connection.update", (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      logger.info("Scan this QR code from the bot number's WhatsApp app (Linked Devices):");
+      qrcodeTerminal.generate(qr, { small: true });
+    }
+
+    if (connection === "close") {
+      const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
+      logger.error({ statusCode }, "WhatsApp connection closed.");
+
+      if (statusCode !== undefined && FATAL_DISCONNECT_CODES.has(statusCode)) {
+        logger.error(
+          { statusCode },
+          "Unrecoverable disconnect (logged out / session replaced / bad session) — not " +
+            "retrying, it would just loop. Delete the auth directory and re-scan the QR code to relink.",
+        );
+        process.exit(1);
+        return;
+      }
+
+      scheduleReconnect(rs);
+    } else if (connection === "open") {
+      reconnectAttempt = 0;
+      logger.info("WhatsApp connection open.");
+    }
+  });
+
+  sock.ev.on("messages.upsert", ({ messages, type }) => {
+    if (type !== "notify") return;
+    for (const msg of messages) {
+      if (msg.key.fromMe) continue;
+      void handleIncomingMessage(sock, appState, msg);
+    }
+  });
+
+  sock.ev.on("messages.update", (updates) => {
+    for (const update of updates) {
+      const pollUpdates = update.update.pollUpdates;
+      if (!pollUpdates) continue;
+      for (const pollUpdate of pollUpdates) {
+        void ratingsModule.handlePollVoteUpdate(appState.db, pollUpdate, localNowIso(cfg.timezone));
+      }
+    }
+  });
+}
+
+async function dispatchCommand(sock: Sock, state: AppState, incoming: IncomingMessage): Promise<void> {
   const [rawCommand, ...args] = incoming.text.split(/\s+/);
   const command = rawCommand.toLowerCase();
 
@@ -100,72 +220,24 @@ async function main(): Promise<void> {
   if (!existsSync(cfg.authDir)) {
     mkdirSync(cfg.authDir, { recursive: true });
   }
-  const { state: authState, saveCreds } = await useMultiFileAuthState(cfg.authDir);
-
-  logger.info("Connecting to WhatsApp.");
-  // Baileys' own log stream is very chatty at info level; give it our
-  // structured logger but pinned to 'warn' so only real problems surface.
-  const baileysLogger = logger.child({ module: "baileys" });
-  baileysLogger.level = "warn";
-  const sock = makeWASocket({
-    auth: authState,
-    logger: baileysLogger as never,
-    printQRInTerminal: false,
-  });
 
   const weekAnchorDate = new Date(cfg.weekAnchorDate + "T00:00:00Z");
-  const appState: AppState = { config: cfg, db, menu: menuData, weekAnchorDate, sock };
+  // `sock` is filled in by `connect()` below before this is read anywhere:
+  // `connect` assigns it synchronously (no `await` in between) as soon as
+  // `makeWASocket` returns, and everything below awaits `connect` first.
+  const appState = { config: cfg, db, menu: menuData, weekAnchorDate } as AppState;
+  const rs: RunningState = { appState, authDir: cfg.authDir };
 
-  sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      logger.info("Scan this QR code from the bot number's WhatsApp app (Linked Devices):");
-      qrcodeTerminal.generate(qr, { small: true });
-    }
-
-    if (connection === "close") {
-      const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      logger.error({ statusCode }, "WhatsApp connection closed.");
-      if (shouldReconnect) {
-        logger.info("Reconnecting.");
-        void main();
-      } else {
-        logger.error("Logged out — delete the auth directory and re-scan the QR code to relink.");
-        process.exit(1);
-      }
-    } else if (connection === "open") {
-      logger.info("WhatsApp connection open.");
-    }
-  });
-
-  sock.ev.on("messages.upsert", ({ messages, type }) => {
-    if (type !== "notify") return;
-    for (const msg of messages) {
-      if (msg.key.fromMe) continue;
-      void handleIncomingMessage(sock, appState, msg);
-    }
-  });
-
-  sock.ev.on("messages.update", (updates) => {
-    for (const update of updates) {
-      const pollUpdates = update.update.pollUpdates;
-      if (!pollUpdates) continue;
-      for (const pollUpdate of pollUpdates) {
-        void ratingsModule.handlePollVoteUpdate(db, pollUpdate, localNowIso(cfg.timezone));
-      }
-    }
-  });
-
+  await connect(rs);
+  // Registered once, here, at process startup — not inside `connect()` —
+  // so a reconnect never re-registers cron jobs on top of the existing
+  // ones. See the comment on `connect()`.
   registerJobs(appState);
   logger.info("Bot ready.");
 }
 
 async function handleIncomingMessage(
-  sock: ReturnType<typeof makeWASocket>,
+  sock: Sock,
   state: AppState,
   msg: WAMessage,
 ): Promise<void> {

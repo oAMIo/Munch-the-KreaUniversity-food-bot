@@ -2,6 +2,18 @@
 Description=Mess Menu WhatsApp Bot
 After=network-online.target
 Wants=network-online.target
+# If it dies and restarts this many times inside this window, stop trying
+# and go to `failed` instead of restarting forever. Transient disconnects
+# are now handled *inside* the process (src/bot.ts reconnects in place
+# with backoff) — a restart only happens for a genuinely fatal case (bad
+# auth session, uncaught exception). Looping systemd restarts on top of a
+# dead WhatsApp session would just hammer WhatsApp's servers with the same
+# invalid credentials over and over, risking a rate-limit/ban. When this
+# trips, `systemctl status menubot` shows `failed` — check the journal,
+# most likely the auth session needs re-linking (delete auth/, re-scan
+# the QR code, restart the unit).
+StartLimitIntervalSec=600
+StartLimitBurst=6
 
 [Service]
 Type=simple
@@ -10,7 +22,7 @@ WorkingDirectory=/home/romulus/Munch-the-KreaUniversity-food-bot
 EnvironmentFile=/home/romulus/Munch-the-KreaUniversity-food-bot/.env
 ExecStart=/home/romulus/.nvm/versions/node/v24.16.0/bin/node /home/romulus/Munch-the-KreaUniversity-food-bot/dist/bot.js
 Restart=always
-RestartSec=10
+RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
