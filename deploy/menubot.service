@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=menubot
-WorkingDirectory=/opt/menubot
-EnvironmentFile=/opt/menubot/.env
-ExecStart=/usr/bin/node /opt/menubot/dist/bot.js
+User=romulus
+WorkingDirectory=/home/romulus/Munch-the-KreaUniversity-food-bot
+EnvironmentFile=/home/romulus/Munch-the-KreaUniversity-food-bot/.env
+ExecStart=/home/romulus/.nvm/versions/node/v24.16.0/bin/node /home/romulus/Munch-the-KreaUniversity-food-bot/dist/bot.js
 Restart=always
 RestartSec=10
 StandardOutput=journal

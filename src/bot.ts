@@ -204,6 +204,24 @@ async function handleIncomingMessage(
   }
 }
 
+// Baileys occasionally throws from deep inside its own internals (e.g. a
+// message-decryption retry request firing on a socket that just closed),
+// well outside the `connection.update` event flow our reconnect logic
+// watches. Node's default behaviour for an uncaught exception/rejection is
+// to kill the process outright, which is what took the bot down. Rather
+// than try to limp along with unknown internal state, log loudly and exit
+// so the process supervisor (systemd, Restart=always) brings up a clean
+// process — see deploy/menubot.service.
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception — exiting for the process supervisor to restart.");
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (err) => {
+  logger.error({ err }, "Unhandled rejection — exiting for the process supervisor to restart.");
+  process.exit(1);
+});
+
 main().catch((err) => {
   logger.error({ err }, "Fatal error during startup.");
   process.exit(1);
