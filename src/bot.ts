@@ -24,6 +24,7 @@ import * as reportsModule from "./reports";
 import * as handlers from "./handlers";
 import type { IncomingMessage } from "./handlers";
 import { registerJobs, type AppState } from "./jobs";
+import { acquireInstanceLock, LockError } from "./lock";
 import { logger } from "./logger";
 import { localNowIso } from "./time";
 
@@ -50,28 +51,33 @@ interface RunningState {
   authDir: string;
 }
 
-// Disconnect codes WhatsApp itself sends when the *session* is no longer
-// valid, not just the socket. Reconnecting on these just spins in a loop
-// hammering WhatsApp's servers with the same dead credentials (risking a
-// rate-limit/ban) — they need a human: re-scan the QR code (loggedOut /
-// badSession / multideviceMismatch), or someone else linked this number
-// elsewhere (connectionReplaced). Everything else (network blips, restart
-// requests, WhatsApp's own periodic connectionClosed) is transient and
-// safe to retry automatically.
+// Disconnect codes meaning the stored *credentials* are dead, not just
+// the socket. No amount of retrying fixes these — they need a human to
+// re-scan the QR code — and retrying would spin against WhatsApp's
+// servers with credentials it has already rejected, risking a
+// rate-limit/ban on the number.
 const FATAL_DISCONNECT_CODES: ReadonlySet<number> = new Set([
   DisconnectReason.loggedOut,
-  DisconnectReason.connectionReplaced,
   DisconnectReason.badSession,
   DisconnectReason.multideviceMismatch,
 ]);
 
 const RECONNECT_DELAYS_SEC = [2, 5, 10, 20, 30, 60];
+// `connectionReplaced` (440) means another connection took over this
+// session — a stray `npm run dev`, or someone opening WhatsApp Web on the
+// bot's number. The credentials are still good, so the bot reclaims the
+// session rather than staying down; but it waits a while first, so two
+// instances can't ping-pong kicking each other off several times a
+// second. src/lock.ts prevents the common local cause outright.
+const RECLAIM_DELAY_SEC = 60;
 let reconnectAttempt = 0;
 let reconnectTimer: NodeJS.Timeout | null = null;
 
-function scheduleReconnect(rs: RunningState): void {
+function scheduleReconnect(rs: RunningState, delayOverrideSec?: number): void {
   if (reconnectTimer) return; // a reconnect is already queued
-  const delaySec = RECONNECT_DELAYS_SEC[Math.min(reconnectAttempt, RECONNECT_DELAYS_SEC.length - 1)];
+  const delaySec =
+    delayOverrideSec ??
+    RECONNECT_DELAYS_SEC[Math.min(reconnectAttempt, RECONNECT_DELAYS_SEC.length - 1)];
   reconnectAttempt += 1;
   logger.info(`Reconnecting to WhatsApp in ${delaySec}s (attempt ${reconnectAttempt}).`);
   reconnectTimer = setTimeout(() => {
@@ -129,10 +135,20 @@ async function connect(rs: RunningState): Promise<void> {
       if (statusCode !== undefined && FATAL_DISCONNECT_CODES.has(statusCode)) {
         logger.error(
           { statusCode },
-          "Unrecoverable disconnect (logged out / session replaced / bad session) — not " +
-            "retrying, it would just loop. Delete the auth directory and re-scan the QR code to relink.",
+          "WhatsApp rejected the stored credentials (logged out / bad session) — retrying can't " +
+            "fix this. Delete the auth directory and re-scan the QR code to relink.",
         );
         process.exit(1);
+        return;
+      }
+
+      if (statusCode === DisconnectReason.connectionReplaced) {
+        logger.error(
+          "Session taken over by another connection — either a second copy of this bot is " +
+            "running against the same auth directory, or WhatsApp Web/a linked device was opened " +
+            `on the bot's number. Reclaiming the session in ${RECLAIM_DELAY_SEC}s.`,
+        );
+        scheduleReconnect(rs, RECLAIM_DELAY_SEC);
         return;
       }
 
@@ -219,6 +235,18 @@ async function main(): Promise<void> {
 
   if (!existsSync(cfg.authDir)) {
     mkdirSync(cfg.authDir, { recursive: true });
+  }
+
+  // Claimed before connecting: two instances sharing one auth directory
+  // would kick each other off WhatsApp indefinitely. See src/lock.ts.
+  try {
+    acquireInstanceLock(cfg.authDir);
+  } catch (err) {
+    if (err instanceof LockError) {
+      logger.error(err.message);
+      process.exit(1);
+    }
+    throw err;
   }
 
   const weekAnchorDate = new Date(cfg.weekAnchorDate + "T00:00:00Z");
