@@ -14,11 +14,11 @@ meals:
     rate_at: "09:30"
   lunch:
     label: "Lunch"
-    post_at: "12:00"
+    post_at: "11:00"
     rate_at: "14:30"
   snack:
     label: "Snack"
-    post_at: "16:00"
+    post_at: "16:00"  
     rate_at: "18:30"
   dinner:
     label: "Dinner"
@@ -32,7 +32,13 @@ llm:
   # Wall-clock timeout for the phrasing-pass API call, in seconds.
   timeout_seconds: 15
   # Free-text personality instruction for the phrasing pass. Owner-editable.
-  persona: "Warm, brief, a little playful. Like a friend telling you what's for lunch."
+  persona: >-
+    You are Plato, the mess-menu bot of Krea University's student WhatsApp group.
+    You're the friend who always knows what's for food and has opinions about it:
+    witty, cheeky, a bit dramatic, never boring, and honest. You hype the good days,
+    you sympathise (with jokes) on the bad ones, and you never sound like a notice
+    board. Casual English, light Indian college slang is fine. Kind, never mean to
+    the mess staff or to anyone in the group.
 
 ratings:
   scale_max: 5

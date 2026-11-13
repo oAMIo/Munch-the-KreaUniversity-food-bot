@@ -1,74 +1,80 @@
-even_week:
-  monday:
-    breakfast: [Idli, Masala Vada, Coconut Chutney, Sambar, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Cucumber Salad, Rice, Phulka, Beetroot Coconut Poriyal, Morkolambu, Curds, Papad, Mixveg Pachdi]
-    snack: [Indian masala Macaroni, Tea]
-    dinner: [Cucumber Pineapple Salad, Rice, Phulka, Andhra Egg Curry, Kadi Pakoda, Buttermilk, Fryums]
-  tuesday:
-    breakfast: [Ven Pongal, Medu Vada, Coconut Chutney, Sambar, Milk/Tea/Coffee, Fruit, Omelette]
-    lunch: [Carrot Cucumber, Rice, Phulka, Aloo Capsicum, Mix Veg Sambar, Curds, Fryums]
-    snack: [Moong Sprouts-Sweet Potato Chat, Tea]
-    dinner: [Tomato Rice, Ragada, Sweet Chutney, Green Chutney, Cucumber Raita, Sev, Sabudana Kheer]
-  wednesday:
-    breakfast: [Kal Dosa, Kadala Curry, Tomato Chutney, Chocos, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Beetroot Salad, Rice, Phulka, Raw Banana Poriyal, Lobia Semi Gravy, Jeera Chaas, Papad]
-    snack: [Boiled Peanut, Tea]
-    dinner: [Onion Cucumber Salad, Rice, Phulka, Kadai Paneer, Plain Dal, Mint Lemon, Fryums]
-  thursday:
-    breakfast: [Kaara Bath, Coconut Chutney, Cornflakes, Milk/Tea/Coffee, Fruit, Omelette]
-    lunch: [Peanut Onion Salad, Rice, Phulka, Carrot Beans Poriyal, PappuCharu, Buttermilk, Papad]
-    snack: [Bread Aloo Pakoda, Tea, Ketchup]
-    dinner: [Kuchumber Salad, Rice, Phulka, Chole, Dal Rasam, Tang, Fryums, GulabJamun]
-  friday:
-    breakfast: [Moong Chilla, Soya Kheema filling, Tomato Chutney, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Onion Cucumber Salad, Rice, Phulka, Snakegourd Fry, Whole Masoor, Curds, Fryums]
-    snack: [Punugulu, Tea, Coconut Chutney]
-    dinner: [Onion Salad, Jeera Rice, Phulka, Paneer Punjabi, Yellow moong Dal, Cucumber Raita, Fryums]
-  saturday:
-    breakfast: [Bhature, Chana Masala, Green Moogdal Sprouts, Fried Green Chilli, Milk/Tea/Coffee, Fruit, Egg Bhurji]
-    lunch: [Corn, onion, Cucumber salad, Rice, Phulka, Chow Chow Poriyal, Mix Veg Sambar, Curds, Round Papad, Mangothoku]
-    snack: [Masala Idli, Tea, Coconut Chutney]
-    dinner: [Bagara Rice, Poori, Green Peas Curry, "—", Cucumber Raita, Fryums, MoongdalPayasam]
-  sunday:
-    breakfast: [Aloo Paratha, Curds/Achar, Tomato Chutney, Chocos, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Kosambri Salad, Rice, Phulka, Dal Tadka, Veg Stirfry, Tomato Rasam, Buttermilk, "—", Gongura Chutney]
-    snack: [Masala corn, Tea]
-    dinner: [Cucumber Salad, Chicken Dum Biryani, Paneer Dum Biryani, Mirchi ka salan, Onion Raita, Fryums]
+# Krea University Dining Menu — Sept & Oct 2026
+# Extracted from the official PDF and verified cell-by-cell against it.
+# A routinely available bread basket (bread, butter, jam) and breakfast
+# cereals on selected days are served in addition to this menu and are
+# not reflected here (per the PDF note).
 
 odd_week:
   monday:
-    breakfast: [Pesarattu, Upma, Peanut Chutney, Sambar, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Onion Carrot Salad, Rice, Bhature, Chole Masala, Cabbage Coconut poriyal, Sambar, Curd, Fryums, Mix veg Pachdi]
-    snack: [Masala Sweet Corn, Tea]
-    dinner: [Cucumber - Pineapple Salad, Veg Fried Rice, Soya Kheema Manchurian, Onion Tomato Egg Curry, Pulka, Buttermilk, Fryums]
+    breakfast: [Pongal, Masala Idly, Peanut Chutney, Sambar, Chocos, Egg Bhurji, Milk/Tea/Coffee, Fruit]
+    lunch: [Cucumber Salad, Steamed Rice, Atta Puri, Chole Masala, Beetroot Poriyal, Mix Veg Sambar, Buttermilk, Fryums, Peanut Onion Chutney]
+    snack: [Macaroni, Tea]
+    dinner: [Cucumber Salad, Steamed Rice, Phulka, Soya Butter Masala, Spicy Andhra Egg Curry (2 Pcs), Buttermilk, Fryums]
   tuesday:
-    breakfast: [Poori, Aloo Masala, Green Moongdal Sprouts, Chocos, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Beetroot Salad, Rice, Phulka, Panchmel Dal, Aloo Gwar Phali, Rasam, Buttermilk, Papad, "—"]
-    snack: [Mysore bonda, Tea, Coconut chutney]
-    dinner: [Kuchumber Salad, Tomato Rice, Phulka, Mix Veg Jalfrezi, Cucumber Raita, Fryums, FruitKesari]
+    breakfast: [Bhatura, Chole, Fried Masala Green Chilly, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Mix Veg Salad, Steamed Rice, Phulka, Channa Dal Tadka, Karela Fry, Tomato Rasam, Curd, Jeera Papad, Mango Pickle]
+    snack: [Boiled Peanut Chaat, Tea]
+    dinner: [Mix Vegetable Pulao, Chapathi, Veg Korma, Cucumber Raita, Semiya Payasam, Fryums]
   wednesday:
-    breakfast: [Rava Idli, Medu Vada, Coconut Chutney, Sambar, Milk/Tea/Coffee, Fruit, Omelette]
-    lunch: [Cucumber Salad, Rice, Phulka, Pappu Charu, Carrot-Beans Coconut Poriyal, Soya Masala, Curd, Round Papad, Doskai Tomato Chutney]
-    snack: [Chilli Bajji, Tea, Green Chutney]
-    dinner: [Onion Cucumber Salad, Rice, Phulka, Paneer Butter Masala, Butter Chicken, Yellow Moong Dal, Lemon Juice, Fryums]
+    breakfast: [Rava Idly, Medu Vada, Tomato Chutney, Sambar, Corn Flakes, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Cucumber Salad, Steamed Rice, Phulka, Mix Veg Sambar, Aloo Fry, Buttermilk, Jeera Papad, Dondakai Tomato Chutney]
+    snack: [Misal Pav (2 Pcs), Tea]
+    dinner: [Lemonade, Steamed Rice, Phulka, Yellow Moong Dal, Paneer Butter Masala (6-8 Pcs), Kadai Chicken (4 Pcs)]
   thursday:
-    breakfast: [Dosa, Potato Filling, Coconut chutney, Sambar, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Chickpea + Onion + Cucumber + Lemon salad, Rice, Phulka, Yam Poriyal, Veg Korma, Tomato Rasam, Butter Milk, "—", Dondkai Tomato Chutney]
-    snack: [Schezwan Macaroni, Tea]
-    dinner: [Onion + Lemon Salad, Pav, Bhaji, "—", "—", Masala Chaas, Kaara Boondhi, Moongdal Payasam]
+    breakfast: [Mix Veg Poha, Cutlets (2 Pcs), Green Chutney, Moong Sprouts, Egg Bhurji, Milk/Tea/Coffee, Fruit]
+    lunch: [Beetroot Salad, Steamed Rice, Phulka, Tomato Dal, Veg Jalfrezi, Rasam, Buttermilk, Fryums, Gongura Chutney]
+    snack: [Veg Mayo Sandwich (2 Slices), Tea]
+    dinner: [Curry Leaf Rice, Phulka, Methi Matar Malai, Butter Milk, Kala Jamun (1 Pcs), Fryums]
   friday:
-    breakfast: [Dalia Upma, Lobia Chana Vada, Tomato Pudina Chutney, Cornflakes, Milk/Tea/Coffee, Fruit, Omelette]
-    lunch: [Veg Corn Peanut Crunch Salad, Rice, Phulka, Karela Fry, Mix Veg Sambar, Sev Tomato Curry, Curds, Papad, Mangothoku Pachdi]
-    snack: [Spinach Corn Sandwich, Tea, Tomato Sauce]
-    dinner: [Onion Salad, Bagara Rice, Phulka, AP Chicken curry, Red Massor Dal, Tang, Fryums]
+    breakfast: [Dosa, Potato Filling, Coconut Chutney, Sambar, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Kosambari Salad, Steamed Rice, Phulka, Dal Makhani, Snake Gourd Fry, Sambar, Jeera Chaas, Fryums, Mango Thokku]
+    snack: [Kala Chana Chaat, Tea]
+    dinner: [Tang Juice, Bagara Rice, Phulka, Paneer Lababdar (6-8 Pcs), Andhra Chicken Curry (4 Pcs)]
   saturday:
-    breakfast: [Veg Poha, Dhokla, Moong Sprouts, Green Chutney, Milk/Tea/Coffee, Fruit, Omelette]
-    lunch: [Onion Cucumber salad, Rice, Phulka, Rajma Masala, Beetroot Poriyal, Mix veg Sambar, Curds, Fryums, "—"]
-    snack: [Onion Pakoda/ Misal pav, Tea]
-    dinner: [Mix Veg Soya Pulao, Idli, Peanut Chutney, Sambar, Sambar, Cucumber Raita, Fryums, GulabJamun]
+    breakfast: [Pav, Ghughni, Onion Lemon Salad, Chocos, Masala Egg Omelette, Milk/Tea/Coffee, Fruit]
+    lunch: [Peanut Corn Salad, Steamed Rice, Chapathi, Sambar, Soya Capsicum Masala, Curd, Round Papad, Dosakai Chutney]
+    snack: [Jhal Muri, Tea]
+    dinner: [Jeera Rice, Phulka, Plain Dal, Kadai Veg, Buttermilk, Sweet Pongal, Fryums]
   sunday:
-    breakfast: [Aloo Paratha, Curds/Achar, Tomato Chutney, Chocos, Milk/Tea/Coffee, Fruit, Boiled Egg]
-    lunch: [Cucumber Salad, Rice, Phulka, Yellow Moong Dal Tadka, Snakegourd Fry, Pepper Rasam, Buttermilk, Fryums, Gongura Pachdi]
-    snack: [Papdi chat, Tea]
-    dinner: [Cucumber Salad, Chicken Dum Biryani, Paneer Dum Biryani, Mirchi ka salan, Onion Raita, Fryums, Lemon Soda (2nd Week), Rose Milk (4th Week), Lemon Juice (1st & 3rd Week)]
+    breakfast: [Aloo Paratha, Achar, Tomato Chutney, Curds, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Sweet Corn Cucumber Salad, Steamed Rice, Phulka, Dal Panchratan, Carrot Beans Poriyal, Pepper Rasam, Curd, Jeera Papad, Lemon Pickle]
+    snack: [Moong Sprouts Chaat, Tea]
+    dinner: [Onion Salad, Paneer Dum Biryani, Chicken Dum Biryani, Mirchi Ka Salan, Mix Veg Raita, "1st & 3rd Week: Fresh Lime Juice / 2nd Week: Fresh Lime Soda / 4th Week: Rose Milk"]
+
+even_week:
+  monday:
+    breakfast: [Idli, Medu Vada, Peanut Chutney, Sambar, Egg Bhurji, Milk/Tea/Coffee, Fruit]
+    lunch: [Cucumber Salad, Steamed Rice, Chapathi, Dal Tadka, Yam Poriyal, Tomato Rasam, Curds, Jeera Papad, Doskai Chutney]
+    snack: [Mysore Bonda (2 Pcs), Coconut Chutney, Tea]
+    dinner: [Mix Veg Salad, Steamed Rice, Phulka, Soya Peas Korma, Tomato Egg Curry (2 Pcs), Buttermilk, Fryums]
+  tuesday:
+    breakfast: [Masala Dosa, Coconut Chutney, Sambar, Cornflakes, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Mix Veg Salad, Steamed Rice, Phulka, Kadi Pakoda, French Beans Carrot Stir Fry, Sambar, Fryums]
+    snack: [Masala Vada (2 Pcs), Tea]
+    dinner: [Jeera Rice, Chapati, Ridge Gourd Chana Dal Curry, Cucumber Raita, Gulab Jamun (1 Pcs), Fryums]
+  wednesday:
+    breakfast: [Dalia Upma, Whole Moong Vada, Coconut Chutney, Omelette, Milk/Tea/Coffee, Fruit]
+    lunch: [Masala Laccha Pyaz, Steamed Rice, Chapathi, Rajma Masala, Raw Banana Poriyal, Dal Rasam, Curds, Fryums]
+    snack: [Green Sprouts with Sweet Potato, Tea]
+    dinner: [Veg Fried Rice, Phulka, Chilli Paneer (6-8 Pcs), Chilli Chicken (4 Pcs)]
+  thursday:
+    breakfast: [Pesarattu, Upma, Tomato Chutney, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Boiled Peanut & Sweetcorn Veg Salad, Steamed Rice, Phulka, Lobia Masala, Aloo Fry, Pepper Rasam, Curds, Jeera Papad, Red Chilli Chutney Coconut]
+    snack: [Dhokla (2 Pcs), Green Chutney, Tea]
+    dinner: [Phulka, Lauki Matar Masala, Steamed Rice, Tomato Daal, Curd, Moong Dal Payasam, Fryums]
+  friday:
+    breakfast: [Poori, Aloo Masala, Chocos, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Cucumber Salad, Steamed Rice, Phulka, Kadai Veg, Mix Veg Sambar, Buttermilk, Fryums]
+    snack: [Veg Mayo Sandwich (2 Slices), Tomato Sauce, Tea]
+    dinner: [Lemon Juice, Bagara Rice, Phulka, Kadai Paneer (6-8 Pcs), Kadai Chicken (4 Pcs), Fryums]
+  saturday:
+    breakfast: [Semiya Upma, Mix Veg Poha, Coconut Chutney, Omelette, Milk/Tea/Coffee, Fruit]
+    lunch: [Masala Laccha Pyaz, Steamed Rice, Phulka, Whole Masoor, Aloo Capsicum Dry, Masala Chas, Fryums]
+    snack: [Papdi Chaat, Tea]
+    dinner: [Onion Lemon Salad, Pav (4 Pcs), Bhaji, Bisi Bele Bath, Fruit Kesari, Karaboondi]
+  sunday:
+    breakfast: [Aloo Methi Paratha, Chilli Pickle, Tomato Chutney, Curds, Cornflakes, Boiled Egg, Milk/Tea/Coffee, Fruit]
+    lunch: [Cucumber Salad, Rice, Phulka, Dal Makhni, Cabbage Pakoda, Tomato Rasam, Buttermilk, Jeera Papad]
+    snack: [Sweet Corn Chat, Tea]
+    dinner: [Cucumber Salad, Paneer Dum Biryani, Chicken Dum Biryani, Mirchi Ka Salan, Mix Veg Raita, "1st & 3rd Week: Fresh Lime Juice / 2nd Week: Fresh Lime Soda / 4th Week: Rose Milk"]
 

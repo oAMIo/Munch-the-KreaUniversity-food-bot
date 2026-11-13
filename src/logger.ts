@@ -5,7 +5,10 @@
 
 import pino from "pino";
 
+// LOG_LEVEL raises/lowers verbosity without a code change ('debug' is
+// useful when diagnosing which messages the bot is receiving and why it
+// is or isn't acting on them).
 export const logger = pino({
-  level: "info",
+  level: process.env.LOG_LEVEL ?? "info",
   timestamp: pino.stdTimeFunctions.isoTime,
 });

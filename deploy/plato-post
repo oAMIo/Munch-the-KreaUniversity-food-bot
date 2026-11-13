@@ -1,0 +1,19 @@
+#!/bin/sh
+# plato-post <breakfast|lunch|snack|dinner> [--again]
+# Post a meal's menu to the group right now (with Plato's intro).
+# Normally skipped if that meal was already posted today; --again posts it anyway.
+meal="$1"
+case "$meal" in breakfast|lunch|snack|dinner) ;; *)
+  echo "Usage: plato-post <breakfast|lunch|snack|dinner> [--again]"; exit 1 ;;
+esac
+force=0; [ "$2" = "--again" ] && force=1
+echo "Posting today's $meal menu (Plato is writing the intro)…"
+out=$(curl -s -m 90 -X POST "http://127.0.0.1:${CONTROL_PORT:-8717}/post?meal=$meal&force=$force") || {
+  echo "✗ Couldn't reach Plato. Is it running? (systemctl status plato)"; exit 1; }
+case "$out" in
+  *'"posted"'*) echo "✓ Posted $meal." ;;
+  *already_posted*) echo "Already posted $meal today. Use: plato-post $meal --again"; exit 1 ;;
+  *no_menu*) echo "No $meal on today's menu, nothing posted."; exit 1 ;;
+  *no_group*) echo "✗ No group set (WHATSAPP_GROUP_JID)."; exit 1 ;;
+  *) echo "✗ Post failed. Check: sudo journalctl -u plato -n 30"; exit 1 ;;
+esac

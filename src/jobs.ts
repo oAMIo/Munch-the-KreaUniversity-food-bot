@@ -51,56 +51,89 @@ export function buildMenuMessage(
   return message;
 }
 
+/**
+ * The menu live today: from MENUS_DIR when set (re-read when a file is
+ * added or changed, so a new menu needs no restart), else the single
+ * menu.yaml loaded at startup. `since` scopes ratings to this menu.
+ */
+export function currentMenu(state: AppState, todayIso: string): { menu: MenuData; anchor: Date; since: string } {
+  const dir = state.config.menusDir;
+  if (dir) {
+    const active = menuModule.activeMenu(dir, todayIso);
+    return { menu: active.menu, anchor: active.anchor, since: active.startIso };
+  }
+  return { menu: state.menu, anchor: state.weekAnchorDate, since: "0000-00-00" };
+}
+
 /** Post today's menu for one meal, if there is one and it isn't already posted. */
-export async function postMenuJob(state: AppState, meal: MealName): Promise<void> {
-  const { config: cfg, db: dbConn, menu: menuData, weekAnchorDate, sock } = state;
+export type PostResult = "posted" | "already_posted" | "no_menu" | "no_group" | "failed";
+
+/**
+ * `force` (manual `plato-post --again`) skips the once-a-day guard.
+ * Returns what happened, for the manual trigger; scheduled runs ignore it.
+ */
+export async function postMenuJob(state: AppState, meal: MealName, force = false): Promise<PostResult> {
+  const { config: cfg, db: dbConn, sock } = state;
   if (!cfg.whatsappGroupJid) {
     logger.warn(`Skipping ${meal} menu post: WHATSAPP_GROUP_JID is not set yet. See README "Getting WHATSAPP_GROUP_JID".`);
-    return;
+    return "no_group";
   }
   try {
     const today = localToday(cfg.timezone);
     const todayIso = today.toISOString().slice(0, 10);
+    const { menu: menuData, anchor: weekAnchorDate, since } = currentMenu(state, todayIso);
 
     const dishes = menuModule.getMenu(menuData, today, weekAnchorDate, meal);
     if (dishes.length === 0) {
       logger.info(`No menu for ${meal} on ${todayIso}; skipping post.`);
-      return;
+      return "no_menu";
     }
 
-    if (db.hasPostedMenu(dbConn, meal, todayIso)) {
+    if (!force && db.hasPostedMenu(dbConn, meal, todayIso)) {
       logger.info(`Menu for ${meal} on ${todayIso} already posted; skipping duplicate fire.`);
-      return;
+      return "already_posted";
     }
 
-    let average: [number, number] | null = null;
-    if (ratingsModule.isCalibrated(dbConn)) {
-      const weekType = menuModule.resolveWeekType(today, weekAnchorDate);
-      const day = menuModule.dayOf(today);
-      average = ratingsModule.slotAverage(dbConn, weekType, day, meal);
-    }
+    const weekType = menuModule.resolveWeekType(today, weekAnchorDate);
+    const day = menuModule.dayOf(today);
+    // Past ratings of this exact slot under the current menu. Shown in the
+    // post only once calibrated, but always given to Plato for its intro.
+    const history = ratingsModule.slotAverage(dbConn, weekType, day, meal, since);
+    const average = ratingsModule.isCalibrated(dbConn, since) ? history : null;
 
     const mealCfg = cfg.meals[meal];
     let message = buildMenuMessage(mealCfg.label, today, dishes, average);
 
     if (cfg.llm.enabled) {
-      const phrased = await llmModule.phraseMenuMessage(cfg.llm, cfg.deepseekApiKey, message, dishes);
+      const phrased = await llmModule.phraseMenuMessage(cfg.llm, cfg.deepseekApiKey, message, {
+        dishes,
+        meal,
+        label: mealCfg.label,
+        date: today,
+        rating: history,
+        scaleMax: cfg.ratings.scaleMax,
+        recentIntros: llmModule.recentIntros(dbConn),
+        recentAngles: llmModule.recentAngles(dbConn),
+      });
       if (phrased !== null) {
-        message = phrased;
+        message = phrased.message;
+        llmModule.rememberIntro(dbConn, phrased.intro, phrased.angle);
       }
     }
 
     await sock.sendMessage(cfg.whatsappGroupJid, { text: message });
     db.markPostedMenu(dbConn, meal, todayIso);
     logger.info(`Posted ${meal} menu for ${todayIso}.`);
+    return "posted";
   } catch (err) {
     logger.error({ err, meal }, "postMenuJob failed");
+    return "failed";
   }
 }
 
 /** Post a rating prompt poll (1..scaleMax) for one meal. */
 export async function ratingPromptJob(state: AppState, meal: MealName): Promise<void> {
-  const { config: cfg, db: dbConn, menu: menuData, weekAnchorDate, sock } = state;
+  const { config: cfg, db: dbConn, sock } = state;
   if (!cfg.whatsappGroupJid) {
     logger.warn(`Skipping ${meal} rating prompt: WHATSAPP_GROUP_JID is not set yet. See README "Getting WHATSAPP_GROUP_JID".`);
     return;
@@ -108,6 +141,7 @@ export async function ratingPromptJob(state: AppState, meal: MealName): Promise<
   try {
     const today = localToday(cfg.timezone);
     const todayIso = today.toISOString().slice(0, 10);
+    const { menu: menuData, anchor: weekAnchorDate } = currentMenu(state, todayIso);
     const weekType = menuModule.resolveWeekType(today, weekAnchorDate);
     const day = menuModule.dayOf(today);
 

@@ -145,17 +145,27 @@ export function upsertRating(
   ).run(args.dateIso, args.weekType, args.day, args.meal, args.userId, args.score, args.createdAtIso);
 }
 
-export function distinctRatedSlotCount(db: DB): number {
+// `since` (YYYY-MM-DD) limits to ratings from the current menu onwards, so
+// a new menu's averages aren't mixed with a previous menu's food.
+export function distinctRatedSlotCount(db: DB, since = "0000-00-00"): number {
   const row = db
-    .prepare("SELECT COUNT(DISTINCT week_type || '|' || day || '|' || meal) AS n FROM ratings")
-    .get() as { n: number };
+    .prepare("SELECT COUNT(DISTINCT week_type || '|' || day || '|' || meal) AS n FROM ratings WHERE date >= ?")
+    .get(since) as { n: number };
   return row.n;
 }
 
-export function slotAverage(db: DB, weekType: WeekType, day: Day, meal: MealName): [number, number] | null {
+export function slotAverage(
+  db: DB,
+  weekType: WeekType,
+  day: Day,
+  meal: MealName,
+  since = "0000-00-00",
+): [number, number] | null {
   const row = db
-    .prepare("SELECT AVG(score) AS avg, COUNT(*) AS count FROM ratings WHERE week_type = ? AND day = ? AND meal = ?")
-    .get(weekType, day, meal) as { avg: number | null; count: number };
+    .prepare(
+      "SELECT AVG(score) AS avg, COUNT(*) AS count FROM ratings WHERE week_type = ? AND day = ? AND meal = ? AND date >= ?",
+    )
+    .get(weekType, day, meal, since) as { avg: number | null; count: number };
   if (!row || row.count === 0) return null;
   return [Math.round(row.avg! * 10) / 10, row.count];
 }

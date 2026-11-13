@@ -17,13 +17,14 @@ import { Boom } from "@hapi/boom";
 import qrcodeTerminal from "qrcode-terminal";
 
 import { loadConfig, ConfigError } from "./config";
-import { loadMenu, MenuError } from "./menu";
+import { listMenuFiles, loadMenu, MenuError } from "./menu";
 import * as dbModule from "./db";
 import * as ratingsModule from "./ratings";
 import * as reportsModule from "./reports";
 import * as handlers from "./handlers";
 import type { IncomingMessage } from "./handlers";
 import { registerJobs, type AppState } from "./jobs";
+import { startControlServer } from "./control";
 import { acquireInstanceLock, LockError } from "./lock";
 import { logger } from "./logger";
 import { localNowIso } from "./time";
@@ -109,21 +110,42 @@ async function connect(rs: RunningState): Promise<void> {
   logger.info("Connecting to WhatsApp.");
   // Baileys' own log stream is very chatty at info level; give it our
   // structured logger but pinned to 'warn' so only real problems surface.
+  // BAILEYS_LOG_LEVEL overrides it — set it to 'debug' to see every frame
+  // sent and received, which is how you tell "WhatsApp isn't delivering
+  // to us" apart from "we received it and dropped it".
   const baileysLogger = logger.child({ module: "baileys" });
-  baileysLogger.level = "warn";
+  baileysLogger.level = process.env.BAILEYS_LOG_LEVEL ?? "warn";
   const sock = makeWASocket({
     auth: authState,
     logger: baileysLogger as never,
     printQRInTerminal: false,
+    // Personal number: don't show as "online" all the time, which would also
+    // stop the owner's phone from getting notifications.
+    markOnlineOnConnect: false,
   });
   appState.sock = sock;
 
   sock.ev.on("creds.update", saveCreds);
 
+  // WHATSAPP_PAIRING_NUMBER (digits only, with country code) links by
+  // code instead of QR: the bot logs an 8-character code, and on the bot
+  // number's phone you go to Linked Devices → Link a Device → "Link with
+  // phone number instead" and type it. Only used while not yet linked.
+  const pairingNumber = (process.env.WHATSAPP_PAIRING_NUMBER ?? "").replace(/\D/g, "");
+  let pairingRequested = false;
+
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr) {
+    if (qr && pairingNumber && !authState.creds.registered) {
+      if (!pairingRequested) {
+        pairingRequested = true;
+        sock
+          .requestPairingCode(pairingNumber)
+          .then((code) => logger.info({ pairingCode: code }, `WhatsApp pairing code for ${pairingNumber}: ${code}`))
+          .catch((err) => logger.error({ err }, "Requesting a WhatsApp pairing code failed."));
+      }
+    } else if (qr) {
       logger.info("Scan this QR code from the bot number's WhatsApp app (Linked Devices):");
       qrcodeTerminal.generate(qr, { small: true });
     }
@@ -131,6 +153,14 @@ async function connect(rs: RunningState): Promise<void> {
     if (connection === "close") {
       const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
       logger.error({ statusCode }, "WhatsApp connection closed.");
+
+      if (pairingNumber && !authState.creds.registered) {
+        // Linking wasn't finished in time. Stop cleanly (exit 0, so systemd
+        // doesn't restart-loop and request code after code from WhatsApp).
+        logger.error("Phone linking wasn't completed. Restart the service for a fresh pairing code.");
+        process.exit(0);
+        return;
+      }
 
       if (statusCode !== undefined && FATAL_DISCONNECT_CODES.has(statusCode)) {
         logger.error(
@@ -160,6 +190,24 @@ async function connect(rs: RunningState): Promise<void> {
   });
 
   sock.ev.on("messages.upsert", ({ messages, type }) => {
+    // Logged before any filtering: if the bot looks unresponsive, this
+    // says whether messages are arriving at all, and if so which filter
+    // below is dropping them. `type` is 'notify' for live messages and
+    // 'append' for ones synced after the fact.
+    logger.debug(
+      {
+        type,
+        count: messages.length,
+        keys: messages.map((m) => ({ remoteJid: m.key.remoteJid, fromMe: m.key.fromMe })),
+      },
+      "messages.upsert received.",
+    );
+
+    // Munch runs on the owner's personal WhatsApp, so it must never act on
+    // incoming messages: no DM reports, no commands, no replies. It only
+    // posts the scheduled menus and rating polls. Set MUNCH_HANDLE_MESSAGES=on
+    // to bring the old report/command handling back on a dedicated number.
+    if (process.env.MUNCH_HANDLE_MESSAGES !== "on") return;
     if (type !== "notify") return;
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
@@ -221,7 +269,17 @@ async function main(): Promise<void> {
 
   let menuData;
   try {
-    menuData = loadMenu(cfg.menuPath);
+    if (cfg.menusDir) {
+      // Validate every scheduled menu up front so a broken file shows up now,
+      // not at 07:00 on its go-live day. Jobs pick the live one each time.
+      const files = listMenuFiles(cfg.menusDir);
+      if (files.length === 0) throw new MenuError(`no menu files in ${cfg.menusDir}.`);
+      for (const f of files) loadMenu(f.path);
+      menuData = loadMenu(files[0].path);
+      logger.info({ menus: files.map((f) => f.startIso) }, "Scheduled menus found.");
+    } else {
+      menuData = loadMenu(cfg.menuPath);
+    }
   } catch (err) {
     if (err instanceof MenuError) {
       logger.error(`Menu validation failed: ${err.message}`);
@@ -261,6 +319,7 @@ async function main(): Promise<void> {
   // so a reconnect never re-registers cron jobs on top of the existing
   // ones. See the comment on `connect()`.
   registerJobs(appState);
+  startControlServer(appState);
   logger.info("Bot ready.");
 }
 

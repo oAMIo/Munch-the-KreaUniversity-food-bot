@@ -10,6 +10,21 @@ A WhatsApp bot (via Baileys) for a university group chat that:
 
 See `SPEC.md` for the full build specification and `AGENTS.md` for repository conventions. The original Telegram/Python implementation is preserved, unmaintained, under `legacy/`.
 
+## Running on the server (Plato)
+
+The bot runs as `plato.service` (user `apps`): code in `/srv/plato`, settings in `/etc/plato/env`, database and WhatsApp session in `/var/lib/plato`. Ship code changes from this repo with `sudo bash deploy/deploy.sh`. It runs on the owner's personal WhatsApp number, so incoming messages are ignored (no DM reports or commands; `MUNCH_HANDLE_MESSAGES=on` would bring them back on a dedicated number).
+
+### Changing the menu
+
+```bash
+plato-menu ~/Downloads/new-menu.pdf "20 Nov"   # read, check, show, confirm, schedule
+plato-menu list                                # which menu is live, which are scheduled
+plato-menu show                                # print the live menu
+plato-menu remove "20 Nov"                     # drop a menu that hasn't gone live
+```
+
+Menus live in `/srv/plato/menus/<go-live date>.yaml`; the bot switches on that date with no restart. The week containing the go-live date is Week 1 of the new two-week cycle. Ratings and averages restart with each new menu.
+
 ## Running locally
 
 Requires Node.js 20+.

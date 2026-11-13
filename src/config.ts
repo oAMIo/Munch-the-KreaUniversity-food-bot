@@ -58,6 +58,8 @@ export interface Config {
   menuPath: string;
   configPath: string;
   authDir: string;
+  // Folder of dated menu files (see menu.ts activeMenu). null = single MENU_PATH file.
+  menusDir: string | null;
 
   // From config.yaml
   timezone: string;
@@ -212,6 +214,7 @@ export function loadConfig(envPath = ".env"): Config {
   const menuPath = process.env.MENU_PATH ?? "menu.yaml";
   const configPath = process.env.CONFIG_PATH ?? "config.yaml";
   const authDir = process.env.AUTH_DIR ?? "auth";
+  const menusDir = (process.env.MENUS_DIR ?? "").trim() || null;
 
   if (!existsSync(configPath)) {
     throw new ConfigError(`config.yaml not found at ${configPath}.`);
@@ -241,6 +244,7 @@ export function loadConfig(envPath = ".env"): Config {
     menuPath,
     configPath,
     authDir,
+    menusDir,
     timezone,
     weekAnchorDate,
     meals,

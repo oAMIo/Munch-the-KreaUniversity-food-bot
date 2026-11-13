@@ -7,7 +7,8 @@
  * never accepts a partial file. Direct port of the old menu.py.
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { join } from "path";
 import * as yaml from "js-yaml";
 import type { MealName } from "./config";
 
@@ -194,4 +195,52 @@ export function dayOf(d: Date): Day {
   const jsDay = d.getUTCDay(); // Sunday=0 ... Saturday=6
   const index = jsDay === 0 ? 6 : jsDay - 1; // 0=monday ... 6=sunday
   return DAYS[index];
+}
+
+// --- scheduled menus ------------------------------------------------------
+// MENUS_DIR holds one file per menu, named by its go-live date:
+// `2026-11-20.yaml`. On any day the live menu is the file with the latest
+// date that is <= today. A menu's two-week cycle starts on its go-live date:
+// the ISO week containing that date is its odd_week (week 1).
+
+export const MENU_FILE_RE = /^(\d{4}-\d{2}-\d{2})\.yaml$/;
+
+export interface MenuFile {
+  startIso: string;
+  path: string;
+}
+
+export interface ActiveMenu {
+  menu: MenuData;
+  startIso: string;
+  anchor: Date;
+}
+
+export function listMenuFiles(dir: string): MenuFile[] {
+  if (!existsSync(dir)) throw new MenuError(`menus folder not found at ${dir}.`);
+  return readdirSync(dir)
+    .map((name) => ({ name, m: MENU_FILE_RE.exec(name) }))
+    .filter((x) => x.m !== null)
+    .map((x) => ({ startIso: x.m![1], path: join(dir, x.name) }))
+    .sort((a, b) => a.startIso.localeCompare(b.startIso));
+}
+
+const menuCache = new Map<string, { mtimeMs: number; menu: MenuData }>();
+
+/** Load a menu file, re-reading it only when it changed on disk. */
+function loadMenuCached(path: string): MenuData {
+  const mtimeMs = statSync(path).mtimeMs;
+  const hit = menuCache.get(path);
+  if (hit && hit.mtimeMs === mtimeMs) return hit.menu;
+  const menu = loadMenu(path);
+  menuCache.set(path, { mtimeMs, menu });
+  return menu;
+}
+
+/** The menu live on `todayIso` (YYYY-MM-DD). Throws MenuError if none has started yet. */
+export function activeMenu(dir: string, todayIso: string): ActiveMenu {
+  const started = listMenuFiles(dir).filter((f) => f.startIso <= todayIso);
+  const current = started[started.length - 1];
+  if (!current) throw new MenuError(`no menu in ${dir} has gone live by ${todayIso}.`);
+  return { menu: loadMenuCached(current.path), startIso: current.startIso, anchor: parseIsoDate(current.startIso) };
 }

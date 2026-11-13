@@ -29,25 +29,46 @@ const CALIBRATED_STATE_KEY = "calibrated";
 // about, since Telegram callback_data was self-contained.
 const openPolls = new Map<string, WAMessage>();
 
-export function isCalibrated(dbConn: DB): boolean {
-  if (db.getState(dbConn, CALIBRATED_STATE_KEY) === "true") {
+export function isCalibrated(dbConn: DB, since = "0000-00-00"): boolean {
+  // Calibration is per menu: a new menu starts uncalibrated.
+  const key = since === "0000-00-00" ? CALIBRATED_STATE_KEY : `${CALIBRATED_STATE_KEY}:${since}`;
+  if (db.getState(dbConn, key) === "true") {
     return true;
   }
-  if (db.distinctRatedSlotCount(dbConn) >= menuModule.TOTAL_SLOTS) {
-    db.setState(dbConn, CALIBRATED_STATE_KEY, "true");
+  if (db.distinctRatedSlotCount(dbConn, since) >= menuModule.TOTAL_SLOTS) {
+    db.setState(dbConn, key, "true");
     logger.info(`Calibration reached: all ${menuModule.TOTAL_SLOTS} slots have been rated at least once.`);
     return true;
   }
   return false;
 }
 
-export function slotAverage(dbConn: DB, weekType: WeekType, day: Day, meal: MealName): [number, number] | null {
-  return db.slotAverage(dbConn, weekType, day, meal);
+export function slotAverage(
+  dbConn: DB,
+  weekType: WeekType,
+  day: Day,
+  meal: MealName,
+  since = "0000-00-00",
+): [number, number] | null {
+  return db.slotAverage(dbConn, weekType, day, meal, since);
 }
 
-/** Deterministic rating-prompt poll question (SPEC.md §6). */
+// Plato's rating questions; one is picked at random so the poll doesn't
+// read the same every day. `{meal}` becomes the meal label.
+const RATING_QUESTIONS = [
+  "How was {meal} today? Tap to rate.",
+  "Verdict time: rate today's {meal} 👇",
+  "Be honest, Plato can take it. How was {meal}?",
+  "{meal} report card, you're the examiner ✍️",
+  "Did {meal} slap or was it a crime? Rate it 👇",
+  "Plato wants to know: how was {meal} today?",
+  "Rate {meal}. Your vote shapes what Plato says next time 👀",
+  "Quick one: how was {meal}? Tap a number.",
+];
+
+/** Rating-prompt poll question (SPEC.md §6), varied by Plato. */
 export function buildRatingPromptMessage(label: string): string {
-  return `How was ${label} today? Tap to rate.`;
+  return RATING_QUESTIONS[Math.floor(Math.random() * RATING_QUESTIONS.length)].replace("{meal}", label);
 }
 
 export function buildRatingPollContent(label: string, scaleMax: number): AnyMessageContent {
